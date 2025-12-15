@@ -1,1 +1,166 @@
 # Project-2-DDS
+
+
+Run these files in order: Final_Project2_DDS_Starter -> Final_Project2 -> Competition_Final
+
+Abalone Age Prediction: Comprehensive Regression Analysis
+Project Overview
+This repository contains a complete machine learning pipeline for predicting abalone age from physical measurements. The project employs rigorous statistical testing, multiple normalization techniques, and advanced regression models to identify the optimal configuration for accurate age estimation.
+
+Problem Statement
+Predicting abalone age directly from measurements is challenging because:
+
+Age determinism: Ring count +1.5 requires destructive sampling
+
+Non-linear relationships: Physical measurements don't scale linearly with age
+
+Feature interactions: Combinations of measurements matter more than individual predictors
+
+Data heterogeneity: Different abalones follow different growth patterns
+
+This analysis systematically evaluates different modeling approaches to find the best solution.
+
+Data & Features
+
+Target Variable: Age (number of rings, proxy for years)
+
+Predictors (8 features):
+
+Sex: Categorical (Male, Female, Infant)
+
+Length: mm (shell length)
+
+Diameter: mm (shell diameter)
+
+Height: mm (shell height)
+
+Whole_weight: grams (total weight)
+
+Shucked_Weight: grams (meat weight)
+
+Viscera_Weight: grams (gut weight)
+
+Shell_Weight: grams (shell alone weight)
+
+Methodology
+Phase 1: Exploratory Data Analysis
+Correlation analysis with Age (Pearson correlation)
+
+Chi-square tests for categorical significance
+
+Variable ranking by predictive strength
+
+Feature distribution visualization
+
+Phase 2: Model Architecture Testing
+Tested 16+ model configurations:
+
+Simple models (1-2 predictors)
+
+Component-based models (dimensional vs. weight measurements)
+
+Full models (all 8 features)
+
+Filtered datasets (binary sex classification)
+
+Best baseline model: All variables, full dataset → MAE: 1.495 years
+
+Phase 3: Normalization Comparison
+Applied 5 normalization techniques to all models:
+
+Z-Score
+Raw Data
+Min-Max
+Unit Scaling
+Raw Data
+
+Phase 4: Advanced Regression Models
+Trained with 100-fold Repeated Cross-Validation:
+
+Multiple Linear Regression (MLR)
+
+Ridge Regression
+
+Lasso Regression
+
+Elastic Net
+
+Results: 20 model-normalization combinations evaluated
+
+Phase 5: Leave-One-Out Cross-Validation (LOOCV)
+Applied rigorous LOOCV for final validation:
+
+Tested all 5 normalization methods with MLR
+
+Runtime: ~20 minutes (32GB RAM system)
+
+Provides theoretical performance ceiling
+
+Important Insights
+All variables matter: Removing features hurt accuracy
+
+Initial hypothesis (selective features) rejected
+
+All 8 predictors contribute to prediction
+
+Feature interactions dominate: Simple models underperform
+
+Dimensionless ratios less predictive than raw measurements
+
+Complex relationships require regularization
+
+Normalization effects are subtle (~0.5% variance)
+
+Most methods perform similarly
+
+[Best method] shows marginal advantage
+
+Regularization helps slightly:
+
+Ridge/Lasso marginally outperform MLR
+
+Feature collinearity is modest (slight shrinkage benefits)
+
+Computational Requirements
+Task	Method	Time	Resources
+EDA & Baseline	Simple CV	5 min	2 GB RAM
+Phase 4 Models	RepeatedCV 100x1	30-45 min	8 GB RAM
+Phase 5 LOOCV and XGB  >40 min	32 GB RAM
+Note: sections marked with 🚨 are computationally intensive. Recommended for reference only—Phase 4 results are sufficient for practical deployment.
+
+Performance Metrics
+MAE (Mean Absolute Error): Primary metric (years of error)
+
+RMSE (Root Mean Squared Error): Penalizes large errors
+
+R² (Coefficient of Determination): Variance explained
+
+Usage Instructions
+Running the Complete Analysis
+r
+(Prior to running the Final_Model_Project2 code please run the "Project2_DDS_Starter" Code First)
+# Load required libraries
+source("setup.R")  # Install all dependencies
+
+# Phase 1: Exploratory Analysis
+source("Phase_1_EDA.R")
+
+# Phase 2: Model Selection
+source("Phase_2_Model_Selection.R")
+
+# Phase 3: Normalization
+source("Phase_3_Normalization.R")
+
+# Phase 4: Advanced Models (Recommended)
+source("Phase_4_Advanced_Models.R")
+
+# Phase 5: LOOCV (Optional - requires 12+ hours)
+# source("Phase_5_LOOCV.R")
+
+# Visualization
+source("Visualization.R")
+Quick Start (15 minutes)
+Run only Phase 1-4 for practical insights without LOOCV overhead.
+
+Production Deployment
+Use the best model from Phase 4 for new predictions:
