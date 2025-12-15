@@ -1,0 +1,58 @@
+library(tidyverse)
+library(corrplot)
+library(skimr)
+library(gridExtra)
+library(ggplot2)
+library(GGally)
+library(fpp2)
+
+#load abalone (train dataset) then change name
+
+abalone <- `train2.(1)`
+
+abalone <- abalone[ , -1]
+
+#Specify Variable Names
+
+
+colnames(abalone) <- c(
+  "Sex",
+  "Diameter",
+  "Length",
+  "Height",
+  "Whole_weight",
+  "Shucked_Weight",
+  "Viscera_Weight",
+  "Shell_Weight",
+  "Age")
+
+
+#summ stats
+dim(abalone)
+
+str(abalone)
+
+summary(abalone)
+  
+#Age Distribution
+ggplot(abalone, aes(x = Age)) +
+    geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+    theme_minimal() +
+    labs(title = "Distribution of Abalone Age", x = "Age (Years)", y = "Count")
+
+#Sex Distribution
+ggplot(abalone, aes(x = Sex, fill = Sex)) +
+  geom_bar() +
+  theme_minimal() +
+  labs(title = "Count by Sex", x = "Sex", y = "Count")
+
+#Correlation Analysis
+numeric_vars <- abalone %>% select_if(is.numeric)
+cor_matrix <- cor(numeric_vars)
+print(sort(cor_matrix[,"Age"], decreasing = TRUE))
+
+corrplot(cor_matrix, method = "circle", type = "upper", 
+         tl.col = "black", tl.srt = 45, 
+         title = "Feature Correlations", mar = c(0,0,1,0))
+
+
