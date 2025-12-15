@@ -1,0 +1,3292 @@
+#______________________________________________________________________________
+# 🚨 🚨 🚨 🚨 🚨 STOP AND READ THIS BEFORE PROCEEDING 🚨 🚨 🚨 🚨 🚨
+#______________________________________________________________________________
+#
+# When you see these red sirens (🚨), STOP and carefully reassess whether 
+# you should run the following code section.
+#
+# The code marked with sirens is COMPUTATIONALLY INTENSIVE and designed for
+# reference/methodological purposes only. Do NOT execute without understanding
+# the resource requirements below.
+#
+# Ask yourself:
+#   ✓ Do I have 12+ hours of uninterrupted computing time?
+#   ✓ Do I have at least 32GB of RAM available?
+#   ✓ Am I prepared for sustained high CPU/GPU usage?
+#   ✓ Do I understand this is NOT required for the analysis?
+#
+# If you answered NO to any of these, then anything with 🚨 should be skipped over and you should proceed to the next section.
+# The primary results above use 100-fold repeated CV, which is sufficient.
+#
+#______________________________________________________________________________
+
+#______________________________________________________________________________
+#So if you see the siren emoji please stop and take into account the computational capacity to time ratio required
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#______________________________________________________________________________
+
+
+library(tidyverse)
+library(corrplot)
+library(skimr)
+library(gridExtra)
+library(ggplot2)
+library(GGally)
+
+
+#Variable TEst
+library(dplyr)
+
+#Load abalone
+Variables <- abalone
+Variables$Sex <- as.factor(Variables$Sex)
+Categorical_vars <- c("Sex")
+
+#correlation strength
+sig_ranking <- correlation_results %>%
+  arrange(desc(abs(Correlation_with_Age))) %>%
+  mutate(Rank = row_number())
+
+print(sig_ranking[, c("variable", "Correlation_with_Age", "p_value", "Rank")])
+
+# VISUALIZATION
+sig_ranking <- correlation_results %>%
+  arrange(Correlation_with_Age)
+
+par(mar = c(5, 12, 4, 2))  # bottom, left, top, right - left=12 is key
+
+# Create horizontal barplot
+bp <- barplot(sig_ranking$Correlation_with_Age,
+horiz = TRUE,
+names.arg = sig_ranking$variable,
+main = "Predictor Strength: Correlation with Age",
+xlab = "Pearson Correlation",
+col = "steelblue",
+cex.names = 0.95,
+xlim = c(0, 0.8),
+las = 1)
+
+text(sig_ranking$Correlation_with_Age + 0.02,
+bp,
+round(sig_ranking$Correlation_with_Age, 3),
+cex = 0.9,
+font = 2,
+adj = 0,
+col = "black")
+
+
+#Linear Regression Model(s)
+set.seed(1)
+
+indices_abalone1 = sample(seq(1:length(Variables$Age)),round(.7*length(Variables$Age)))
+
+train_abalone1 = Variables[indices_abalone1,]
+test_abalone1 = Variables[-indices_abalone1,]
+
+# Model 1: simple/ best guess based on significance test
+fit1 = lm(Age ~ Whole_weight + Sex, data = train_abalone1)
+
+# Model 2: now lets use all of the other variables that are correlated to Whole_Weight to test the above thesis
+fit2 = lm(Age ~ Sex + Length + Diameter + Height + Shell_Weight + Viscera_Weight, 
+          data = train_abalone1)
+
+# Model 3: Now lets use every variable except Shucked Weight
+fit3 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Viscera_Weight + Diameter + Height, 
+          data = train_abalone1)
+
+# Model 4: All variables - Complete model
+fit4 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, 
+          data = train_abalone1)
+
+# Model 9: MM only
+fit9 = lm(Age ~ Length + Diameter + Height, data = train_abalone1)
+
+# Model 10: Grams only
+fit10 = lm(Age ~ Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, 
+           data = train_abalone1)
+
+# Model 11: mm plus sex (non binary all three types)
+fit11 = lm(Age ~ Sex + Length + Diameter + Height, 
+           data = train_abalone1)
+
+# Model 12: Grams plus sex (non binary all three types)
+fit12 = lm(Age ~ Sex + Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, 
+           data = train_abalone1)
+
+#summary and define models
+summary(fit1)
+fitted1_train <- fitted(fit1)
+
+summary(fit2)
+fitted2_train <- fitted(fit2)
+
+summary(fit3)
+fitted3_train <- fitted(fit3)
+
+summary(fit4)
+fitted4_train <- fitted(fit4)
+
+summary(fit9)
+fitted9_train <- fitted(fit9)
+
+summary(fit10)
+fitted10_train <- fitted(fit10)
+
+summary(fit11)
+fitted11_train <- fitted(fit11)
+
+summary(fit12)
+fitted12_train <- fitted(fit12)
+
+# Calculate MAE and RMSE for training data
+mae1_train <- mean(abs(train_abalone1$Age - fitted1_train))
+rmse1_train <- sqrt(mean((train_abalone1$Age - fitted1_train)^2))
+
+mae2_train <- mean(abs(train_abalone1$Age - fitted2_train))
+rmse2_train <- sqrt(mean((train_abalone1$Age - fitted2_train)^2))
+
+mae3_train <- mean(abs(train_abalone1$Age - fitted3_train))
+rmse3_train <- sqrt(mean((train_abalone1$Age - fitted3_train)^2))
+
+mae4_train <- mean(abs(train_abalone1$Age - fitted4_train))
+rmse4_train <- sqrt(mean((train_abalone1$Age - fitted4_train)^2))
+
+mae9_train <- mean(abs(train_abalone1$Age - fitted9_train))
+rmse9_train <- sqrt(mean((train_abalone1$Age - fitted9_train)^2))
+
+mae10_train <- mean(abs(train_abalone1$Age - fitted10_train))
+rmse10_train <- sqrt(mean((train_abalone1$Age - fitted10_train)^2))
+
+mae11_train <- mean(abs(train_abalone1$Age - fitted11_train))
+rmse11_train <- sqrt(mean((train_abalone1$Age - fitted11_train)^2))
+
+mae12_train <- mean(abs(train_abalone1$Age - fitted12_train))
+rmse12_train <- sqrt(mean((train_abalone1$Age - fitted12_train)^2))
+
+#Predict the test data
+pred1_test <- predict(fit1, newdata = test_abalone1)
+pred2_test <- predict(fit2, newdata = test_abalone1)
+pred3_test <- predict(fit3, newdata = test_abalone1)
+pred4_test <- predict(fit4, newdata = test_abalone1)
+
+pred9_test <- predict(fit9, newdata = test_abalone1)
+pred10_test <- predict(fit10, newdata = test_abalone1)
+pred11_test <- predict(fit11, newdata = test_abalone1)
+pred12_test <- predict(fit12, newdata = test_abalone1)
+
+#Accuracy of predictions
+
+mae1_test <- mean(abs(test_abalone1$Age - pred1_test))
+rmse1_test <- sqrt(mean((test_abalone1$Age - pred1_test)^2))
+
+mae2_test <- mean(abs(test_abalone1$Age - pred2_test))
+rmse2_test <- sqrt(mean((test_abalone1$Age - pred2_test)^2))
+
+mae3_test <- mean(abs(test_abalone1$Age - pred3_test))
+rmse3_test <- sqrt(mean((test_abalone1$Age - pred3_test)^2))
+
+mae4_test <- mean(abs(test_abalone1$Age - pred4_test))
+rmse4_test <- sqrt(mean((test_abalone1$Age - pred4_test)^2))
+
+mae9_test <- mean(abs(test_abalone1$Age - pred9_test))
+rmse9_test <- sqrt(mean((test_abalone1$Age - pred9_test)^2))
+
+mae10_test <- mean(abs(test_abalone1$Age - pred10_test))
+rmse10_test <- sqrt(mean((test_abalone1$Age - pred10_test)^2))
+
+mae11_test <- mean(abs(test_abalone1$Age - pred11_test))
+rmse11_test <- sqrt(mean((test_abalone1$Age - pred11_test)^2))
+
+mae12_test <- mean(abs(test_abalone1$Age - pred12_test))
+rmse12_test <- sqrt(mean((test_abalone1$Age - pred12_test)^2))
+
+#Re-evaluation Models (Sex as binary (w/o infant category) and MM and Grams tested separately)
+Binary_Sexes <- Variables %>%
+  filter(Sex %in% c("M", "F"))
+
+Binary_Sexes$Sex <- factor(Binary_Sexes$Sex)
+str(Binary_Sexes)
+
+set.seed(1)
+
+indices_Binary_Sexes = sample(seq(1:length(Binary_Sexes$Age)),round(.7*length(Binary_Sexes$Age)))
+
+train_Binary_Sexes = Binary_Sexes[indices_Binary_Sexes,]
+test_Binary_Sexes = Binary_Sexes[-indices_Binary_Sexes,]
+
+# Model 5: Model 1 filtered for Binary Sexes
+fit5 = lm(Age ~ Whole_weight + Sex, data = train_Binary_Sexes)
+
+# Model 6: Model 2 filtered for Binary Sexes
+fit6 = lm(Age ~ Sex + Length + Diameter + Height + Shell_Weight + Viscera_Weight, 
+          data = train_Binary_Sexes)
+
+# Model 7: Model 3 filtered for Binary Sexes
+fit7 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Viscera_Weight + Diameter + Height, 
+          data = train_Binary_Sexes)
+
+# Model 8: Model 4 filtered for Binary Sexes
+fit8 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, 
+          data = train_Binary_Sexes)
+
+# Model 13: Model 11 filtered for Binary Sexes
+fit13 = lm(Age ~ Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, data = train_Binary_Sexes)
+
+# Model 14: Model 12 filtered for Binary Sexes
+fit14 = lm(Age ~ Sex + Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, 
+           data = train_Binary_Sexes)
+
+# Model 15: Model 9 filtered for Binary Sexes but not using sex as predictor
+fit15 = lm(Age ~ Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, data = train_Binary_Sexes)
+
+# Model 16: Model 12 filtered for Binary Sexes but not using sex as predictor
+fit16 = lm(Age ~ Whole_weight + Shucked_Weight + Viscera_Weight + Shell_Weight, 
+           data = train_Binary_Sexes)
+
+
+#summary and define models
+summary(fit5)
+fitted5_train <- fitted(fit5)
+
+summary(fit6)
+fitted6_train <- fitted(fit6)
+
+summary(fit7)
+fitted7_train <- fitted(fit7)
+
+summary(fit8)
+fitted8_train <- fitted(fit8)
+
+summary(fit13)
+fitted13_train <- fitted(fit13)
+
+summary(fit14)
+fitted14_train <- fitted(fit14)
+
+summary(fit15)
+fitted15_train <- fitted(fit15)
+
+summary(fit16)
+fitted16_train <- fitted(fit16)
+
+# Calculate MAE and RMSE for training data
+mae5_train <- mean(abs(train_Binary_Sexes$Age - fitted5_train))
+rmse5_train <- sqrt(mean((train_Binary_Sexes$Age - fitted5_train)^2))
+
+mae6_train <- mean(abs(train_Binary_Sexes$Age - fitted6_train))
+rmse6_train <- sqrt(mean((train_Binary_Sexes$Age - fitted6_train)^2))
+
+mae7_train <- mean(abs(train_Binary_Sexes$Age - fitted7_train))
+rmse7_train <- sqrt(mean((train_Binary_Sexes$Age - fitted7_train)^2))
+
+mae8_train <- mean(abs(train_Binary_Sexes$Age - fitted8_train))
+rmse8_train <- sqrt(mean((train_Binary_Sexes$Age - fitted8_train)^2))
+
+mae13_train <- mean(abs(train_Binary_Sexes$Age - fitted13_train))
+rmse13_train <- sqrt(mean((train_Binary_Sexes$Age - fitted13_train)^2))
+
+mae14_train <- mean(abs(train_Binary_Sexes$Age - fitted14_train))
+rmse14_train <- sqrt(mean((train_Binary_Sexes$Age - fitted14_train)^2))
+
+mae15_train <- mean(abs(train_Binary_Sexes$Age - fitted15_train))
+rmse15_train <- sqrt(mean((train_Binary_Sexes$Age - fitted15_train)^2))
+
+mae16_train <- mean(abs(train_Binary_Sexes$Age - fitted16_train))
+rmse16_train <- sqrt(mean((train_Binary_Sexes$Age - fitted16_train)^2))
+
+
+#Predict the test data
+pred5_test <- predict(fit5, newdata = test_Binary_Sexes)
+pred6_test <- predict(fit6, newdata = test_Binary_Sexes)
+pred7_test <- predict(fit7, newdata = test_Binary_Sexes)
+pred8_test <- predict(fit8, newdata = test_Binary_Sexes)
+
+pred13_test <- predict(fit13, newdata = test_Binary_Sexes)
+pred14_test <- predict(fit14, newdata = test_Binary_Sexes)
+pred15_test <- predict(fit15, newdata = test_Binary_Sexes)
+pred16_test <- predict(fit16, newdata = test_Binary_Sexes)
+
+#Accuracy of predictions
+
+mae5_test <- mean(abs(test_Binary_Sexes$Age - pred5_test))
+rmse5_test <- sqrt(mean((test_Binary_Sexes$Age - pred5_test)^2))
+
+mae6_test <- mean(abs(test_Binary_Sexes$Age - pred6_test))
+rmse6_test <- sqrt(mean((test_Binary_Sexes$Age - pred6_test)^2))
+
+mae7_test <- mean(abs(test_Binary_Sexes$Age - pred7_test))
+rmse7_test <- sqrt(mean((test_Binary_Sexes$Age - pred7_test)^2))
+
+mae8_test <- mean(abs(test_Binary_Sexes$Age - pred8_test))
+rmse8_test <- sqrt(mean((test_Binary_Sexes$Age - pred8_test)^2))
+
+mae13_test <- mean(abs(test_Binary_Sexes$Age - pred13_test))
+rmse13_test <- sqrt(mean((test_Binary_Sexes$Age - pred13_test)^2))
+
+mae14_test <- mean(abs(test_Binary_Sexes$Age - pred14_test))
+rmse14_test <- sqrt(mean((test_Binary_Sexes$Age - pred14_test)^2))
+
+mae15_test <- mean(abs(test_Binary_Sexes$Age - pred15_test))
+rmse15_test <- sqrt(mean((test_Binary_Sexes$Age - pred15_test)^2))
+
+mae16_test <- mean(abs(test_Binary_Sexes$Age - pred16_test))
+rmse16_test <- sqrt(mean((test_Binary_Sexes$Age - pred16_test)^2))
+
+# TOP 5 MODELS: Comprehensive Comparison
+# This shows all tested approaches & why simplicity wins
+
+# Create comprehensive results dataframe with ALL models tested
+all_models_results <- data.frame(
+  Model_ID = c(
+    "Model 4:\nAll Variables\n(Full Data)",
+    "Model 8:\nAll Variables\n(No Infants)",
+    "Model 3:\nAll Except\nShucked Weight",
+    "Model 12:\nGrams + Sex",
+    "Model 2:\nMeasurements +\nViscera"
+  ),
+  MAE_Test = c(
+    mae4_test,
+    mae8_test,
+    mae3_test,
+    mae12_test,
+    mae2_test
+  ),
+  Dataset = c("Full", "Filtered", "Full", "Full", "Full"),
+  Features = c(8, 8, 7, 5, 6),
+  Rank = c(1, 2, 3, 4, 5)
+)
+
+# Sort by MAE
+all_models_results <- all_models_results[order(all_models_results$MAE_Test), ]
+
+
+#VISUALIZATION 1: ranking bar chart
+par(mar = c(8, 5, 5, 2))
+
+colors <- c("darkgreen", "orange", "steelblue", "red", "purple")
+bp <- barplot(all_models_results$MAE_Test,
+names.arg = all_models_results$Model_ID,
+main = "Model Comparison: 16+ Configurations Tested\nTop 5 Results",
+ylab = "Test MAE (Lower is Better)",
+col = colors,
+cex.names = 0.75,
+las = 2,
+ylim = c(0, max(all_models_results$MAE_Test) * 1.2))
+
+#Add value labels
+text(bp, all_models_results$MAE_Test + 0.05,
+round(all_models_results$MAE_Test, 3),
+cex = 0.85,
+font = 2)
+
+#Add rankings
+text(bp, rep(max(all_models_results$MAE_Test) * 1.15, 5),
+c("#1", "#2", "#3", "#4", "#5"),
+cex = 0.9,
+font = 2,
+adj = 0.5)
+
+
+
+#VISUALIZATION 3: Key Findings Summary
+par(mar = c(2, 2, 4, 2))
+plot.new()
+
+text(0.5, 0.96, "What We Learned",
+     cex = 1.3, font = 2, adj = 0.5)
+
+# Draw result box
+rect(0.08, 0.15, 0.92, 0.88, border = "darkred", lwd = 3)
+
+findings <- c(
+  "BEST MODEL: All Variables + Full Dataset",
+  sprintf("MAE: %.3f years", mae4_test),
+  "",
+  "REJECTED HYPOTHESES:",
+  "• Removing infants did not improve accuracy",
+  "• Isolating unit types (mm vs grams) did not help",
+  "",
+  "DECISION: Use all variables in all of the following models"
+)
+
+y_pos <- 0.82
+for (line in findings) {
+  if (grepl("BEST MODEL", line)) {
+    text(0.5, y_pos, line, cex = 0.95, font = 2, col = "darkgreen", adj = 0.5)
+  } else if (grepl("REJECTED", line)) {
+    text(0.5, y_pos, line, cex = 0.95, font = 2, col = "darkred", adj = 0.5)
+  } else if (grepl("Removing|Isolating", line)) {
+    text(0.5, y_pos, line, cex = 0.85, font = 1, col = "darkred", adj = 0.5)
+  } else if (grepl("DECISION", line)) {
+    text(0.5, y_pos, line, cex = 0.95, font = 2, col = "darkgreen", adj = 0.5)
+  } else if (line == "") {
+    y_pos <- y_pos - 0.05
+    next
+  } else if (grepl("MAE", line)) {
+    text(0.5, y_pos, line, cex = 0.85, font = 1, col = "black", adj = 0.5)
+  } else {
+    text(0.5, y_pos, line, cex = 0.85, font = 1, col = "black", adj = 0.5)
+  }
+  y_pos <- y_pos - 0.095
+}
+
+
+
+
+
+
+
+
+
+
+
+
+#Third Evaluation Models:(normalizing the variable measurements) 
+#Z-Score normalization
+normalized_abalone <- Variables
+
+#mm
+normalized_abalone$Length <- scale(Variables$Length)[,1]
+normalized_abalone$Diameter <- scale(Variables$Diameter)[,1]
+normalized_abalone$Height <- scale(Variables$Height)[,1]
+#grams
+normalized_abalone$Whole_weight <- scale(Variables$Whole_weight)[,1]
+normalized_abalone$Shucked_Weight <- scale(Variables$Shucked_Weight)[,1]
+normalized_abalone$Viscera_Weight <- scale(Variables$Viscera_Weight)[,1]
+normalized_abalone$Shell_Weight <- scale(Variables$Shell_Weight)[,1]
+
+set.seed(1)
+
+indicesIndices_norm = sample(seq(1:length(normalized_abalone$Age)),round(.7*length(normalized_abalone$Age)))
+
+trainIndices_norm = normalized_abalone[indicesIndices_norm,]
+testIndices_norm = normalized_abalone[-indicesIndices_norm,]
+
+#Min-Max normalize dimensional variables
+minmax_abalone <- Variables
+
+#mm
+minmax_abalone$Length <- (Variables$Length - min(Variables$Length)) / (max(Variables$Length) - min(Variables$Length))
+minmax_abalone$Diameter <- (Variables$Diameter - min(Variables$Diameter)) / (max(Variables$Diameter) - min(Variables$Diameter))
+minmax_abalone$Height <- (Variables$Height - min(Variables$Height)) / (max(Variables$Height) - min(Variables$Height))
+
+#grams
+minmax_abalone$Whole_weight <- (Variables$Whole_weight - min(Variables$Whole_weight)) / (max(Variables$Whole_weight) - min(Variables$Whole_weight))
+minmax_abalone$Shucked_Weight <- (Variables$Shucked_Weight - min(Variables$Shucked_Weight)) / (max(Variables$Shucked_Weight) - min(Variables$Shucked_Weight))
+minmax_abalone$Viscera_Weight <- (Variables$Viscera_Weight - min(Variables$Viscera_Weight)) / (max(Variables$Viscera_Weight) - min(Variables$Viscera_Weight))
+minmax_abalone$Shell_Weight <- (Variables$Shell_Weight - min(Variables$Shell_Weight)) / (max(Variables$Shell_Weight) - min(Variables$Shell_Weight))
+
+set.seed(1)
+
+Indices_minmax = sample(seq(1:length(minmax_abalone$Age)),round(.7*length(minmax_abalone$Age)))
+
+trainIndices_minmax = minmax_abalone[Indices_minmax,]
+testIndices_minmax = minmax_abalone[-Indices_minmax,]
+
+#Unit Scale
+unitscale_abalone <- Variables
+
+#mm
+unitscale_abalone$Length <- Variables$Length / max(Variables$Length)
+unitscale_abalone$Diameter <- Variables$Diameter / max(Variables$Diameter)
+unitscale_abalone$Height <- Variables$Height / max(Variables$Height)
+
+#grams
+unitscale_abalone$Whole_weight <- Variables$Whole_weight / max(Variables$Whole_weight)
+unitscale_abalone$Shucked_Weight <- Variables$Shucked_Weight / max(Variables$Shucked_Weight)
+unitscale_abalone$Viscera_Weight <- Variables$Viscera_Weight / max(Variables$Viscera_Weight)
+unitscale_abalone$Shell_Weight <- Variables$Shell_Weight / max(Variables$Shell_Weight)
+
+set.seed(1)
+
+Indices_unitscale = sample(seq(1:length(unitscale_abalone$Age)),round(.7*length(unitscale_abalone$Age)))
+
+trainIndices_unitscale = unitscale_abalone[Indices_unitscale,]
+testIndices_unitscale = unitscale_abalone[-Indices_unitscale,]
+
+#Robust Scaling
+robustscaling_abalone <- Variables
+
+#mm
+robustscaling_abalone$Length <- (Variables$Length - median(Variables$Length)) / (quantile(Variables$Length, 0.75) - quantile(Variables$Length, 0.25))
+robustscaling_abalone$Diameter <- (Variables$Diameter - median(Variables$Diameter)) / (quantile(Variables$Diameter, 0.75) - quantile(Variables$Diameter, 0.25))
+robustscaling_abalone$Height <- (Variables$Height - median(Variables$Height)) / (quantile(Variables$Height, 0.75) - quantile(Variables$Height, 0.25))
+
+#grams
+robustscaling_abalone$Whole_weight <- (Variables$Whole_weight - median(Variables$Whole_weight)) / (quantile(Variables$Whole_weight, 0.75) - quantile(Variables$Whole_weight, 0.25))
+robustscaling_abalone$Shucked_Weight <- (Variables$Shucked_Weight - median(Variables$Shucked_Weight)) / (quantile(Variables$Shucked_Weight, 0.75) - quantile(Variables$Shucked_Weight, 0.25))
+robustscaling_abalone$Viscera_Weight <- (Variables$Viscera_Weight - median(Variables$Viscera_Weight)) / (quantile(Variables$Viscera_Weight, 0.75) - quantile(Variables$Viscera_Weight, 0.25))
+robustscaling_abalone$Shell_Weight <- (Variables$Shell_Weight - median(Variables$Shell_Weight)) / (quantile(Variables$Shell_Weight, 0.75) - quantile(Variables$Shell_Weight, 0.25))
+
+set.seed(1)
+
+Indices_robustscaling = sample(seq(1:length(robustscaling_abalone$Age)),round(.7*length(robustscaling_abalone$Age)))
+
+trainIndices_robustscaling = robustscaling_abalone[Indices_robustscaling,]
+testIndices_robustscaling = robustscaling_abalone[-Indices_robustscaling,]
+
+
+# Model 17: Model 4 (lowest MAE) z-score normalization
+fit17 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, data = trainIndices_norm)
+
+# Model 18: Model 4 (lowest MAE) MIN-MAX normalization
+fit18 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, data = trainIndices_minmax)
+
+# Model 19: Model 4 (lowest MAE) Unit Scaling
+fit19 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, data = trainIndices_unitscale)
+
+# Model 20: Model 4 (lowest MAE) Robust Scaling
+fit20 = lm(Age ~ Sex + Length + Shell_Weight + Whole_weight + Shucked_Weight + Viscera_Weight + Diameter + Height, data = trainIndices_robustscaling)
+
+#summary and define models
+summary(fit17)
+fitted17_train <- fitted(fit17)
+
+summary(fit18)
+fitted18_train <- fitted(fit18)
+
+summary(fit19)
+fitted19_train <- fitted(fit19)
+
+summary(fit20)
+fitted20_train <- fitted(fit20)
+
+# Calculate MAE and RMSE for training data
+mae17_train <- mean(abs(trainIndices_norm$Age - fitted17_train))
+rmse17_train <- sqrt(mean((trainIndices_norm$Age - fitted17_train)^2))
+
+mae18_train <- mean(abs(trainIndices_minmax$Age - fitted18_train))
+rmse18_train <- sqrt(mean((trainIndices_minmax$Age - fitted18_train)^2))
+
+mae19_train <- mean(abs(trainIndices_unitscale$Age - fitted19_train))
+rmse19_train <- sqrt(mean((trainIndices_unitscale$Age - fitted19_train)^2))
+
+mae20_train <- mean(abs(trainIndices_robustscaling$Age - fitted20_train))
+rmse20_train <- sqrt(mean((trainIndices_robustscaling$Age - fitted20_train)^2))
+
+
+#Predict the test data
+pred17_test <- predict(fit17, newdata = testIndices_norm)
+pred18_test <- predict(fit18, newdata = testIndices_minmax)
+pred19_test <- predict(fit19, newdata = testIndices_unitscale)
+pred20_test <- predict(fit20, newdata = testIndices_robustscaling)
+
+#Accuracy of predictions
+
+mae17_test <- mean(abs(testIndices_norm$Age - pred17_test))
+rmse17_test <- sqrt(mean((testIndices_norm$Age - pred17_test)^2))
+
+mae18_test <- mean(abs(testIndices_minmax$Age - pred18_test))
+rmse18_test <- sqrt(mean((testIndices_minmax$Age - pred18_test)^2))
+
+mae19_test <- mean(abs(testIndices_unitscale$Age - pred19_test))
+rmse19_test <- sqrt(mean((testIndices_unitscale$Age - pred19_test)^2))
+
+mae20_test <- mean(abs(testIndices_robustscaling$Age - pred20_test))
+rmse20_test <- sqrt(mean((testIndices_robustscaling$Age - pred20_test)^2))
+
+
+
+
+
+
+#Now lets use repeatedCV with the normalization methods
+if (!require(caret)) install.packages("caret")
+if (!require(Metrics)) install.packages("Metrics")
+library(caret)
+library(Metrics)
+
+set.seed(1)
+
+train_control_cv <- trainControl(
+  method = "repeatedcv",
+  number = 100,
+  repeats = 1,
+  summaryFunction = defaultSummary
+)
+X_zscore <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore <- normalized_abalone$Age
+data_ml_zscore <- data.frame(Age = y_zscore, X_zscore)
+
+model_zscore_cv <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax <- minmax_abalone$Age
+data_ml_minmax <- data.frame(Age = y_minmax, X_minmax)
+
+model_minmax_cv <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#unitscaling
+X_unitscale <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale <- unitscale_abalone$Age
+data_ml_unitscale <- data.frame(Age = y_unitscale, X_unitscale)
+
+model_unitscale_cv <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling <- robustscaling_abalone$Age
+data_ml_robustscaling <- data.frame(Age = y_robustscaling, X_robustscaling)
+
+model_robustscaling_cv <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#raw data
+X_raw <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw <- Variables$Age
+data_ml_raw <- data.frame(Age = y_raw, X_raw)
+
+model_raw_cv <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#comparison chart
+comparison_results <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    model_raw_cv$results$MAE,
+    model_zscore_cv$results$MAE,
+    model_minmax_cv$results$MAE,
+    model_unitscale_cv$results$MAE,
+    model_robustscaling_cv$results$MAE
+  ),
+  RMSE = c(
+    model_raw_cv$results$RMSE,
+    model_zscore_cv$results$RMSE,
+    model_minmax_cv$results$RMSE,
+    model_unitscale_cv$results$RMSE,
+    model_robustscaling_cv$results$RMSE
+  ),
+  stringsAsFactors = FALSE
+)
+
+comparison_results <- comparison_results[order(comparison_results$MAE), ]
+print(comparison_results)
+
+best_method <- comparison_results$Method[1]
+print(best_method)
+
+
+#Visualization
+# RepeatedCV Normalization Methods Visualization (CORRECTED)
+# Unique & Visually Appealing: Radial/Radar + Performance Metrics Dashboard
+
+if (!require(caret)) install.packages("caret")
+if (!require(Metrics)) install.packages("Metrics")
+library(caret)
+library(Metrics)
+
+set.seed(1)
+
+train_control_cv <- trainControl(
+  method = "repeatedcv",
+  number = 100,
+  repeats = 1,
+  summaryFunction = defaultSummary
+)
+
+# Z-Score
+X_zscore <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore <- normalized_abalone$Age
+data_ml_zscore <- data.frame(Age = y_zscore, X_zscore)
+model_zscore_cv <- train(Age ~ ., data = data_ml_zscore, method = "lm", 
+                         trControl = train_control_cv, metric = "MAE")
+
+# Min-Max
+X_minmax <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax <- minmax_abalone$Age
+data_ml_minmax <- data.frame(Age = y_minmax, X_minmax)
+model_minmax_cv <- train(Age ~ ., data = data_ml_minmax, method = "lm", 
+                         trControl = train_control_cv, metric = "MAE")
+
+# Unit Scaling
+X_unitscale <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale <- unitscale_abalone$Age
+data_ml_unitscale <- data.frame(Age = y_unitscale, X_unitscale)
+model_unitscale_cv <- train(Age ~ ., data = data_ml_unitscale, method = "lm", 
+                            trControl = train_control_cv, metric = "MAE")
+
+# Robust Scaling
+X_robustscaling <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling <- robustscaling_abalone$Age
+data_ml_robustscaling <- data.frame(Age = y_robustscaling, X_robustscaling)
+model_robustscaling_cv <- train(Age ~ ., data = data_ml_robustscaling, method = "lm", 
+                                trControl = train_control_cv, metric = "MAE")
+
+# Raw Data
+X_raw <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw <- Variables$Age
+data_ml_raw <- data.frame(Age = y_raw, X_raw)
+model_raw_cv <- train(Age ~ ., data = data_ml_raw, method = "lm", 
+                      trControl = train_control_cv, metric = "MAE")
+
+
+# Compile Results
+comparison_results <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    model_raw_cv$results$MAE,
+    model_zscore_cv$results$MAE,
+    model_minmax_cv$results$MAE,
+    model_unitscale_cv$results$MAE,
+    model_robustscaling_cv$results$MAE
+  ),
+  RMSE = c(
+    model_raw_cv$results$RMSE,
+    model_zscore_cv$results$RMSE,
+    model_minmax_cv$results$RMSE,
+    model_unitscale_cv$results$RMSE,
+    model_robustscaling_cv$results$RMSE
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Sort by MAE
+comparison_results <- comparison_results[order(comparison_results$MAE), ]
+print("RepeatedCV Normalization Comparison (100 folds, 1 repeat):")
+print(comparison_results)
+
+# VISUALIZATION: Corrected Scaling
+# Create two-panel layout
+par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), oma = c(1, 1, 3, 1))
+
+#PANEL 1: Circular Performance Gauge
+methods <- comparison_results$Method
+mae_values <- comparison_results$MAE
+rmse_values <- comparison_results$RMSE
+
+# Calculate
+best_mae <- min(mae_values)
+mae_diff <- mae_values - best_mae  # Difference from best (0 for best, positive for worse)
+
+max_diff <- max(mae_diff)
+if (max_diff == 0) {
+  mae_score <- rep(100, length(mae_values))
+} else {
+  
+  mae_score <- 100 - (mae_diff / max_diff * 80)  # 80-point spread for visibility
+}
+n_methods <- length(methods)
+angles <- seq(0, 2*pi, length.out = n_methods + 1)[-(n_methods + 1)]
+plot(NULL, xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5),
+     asp = 1, axes = FALSE, xlab = "", ylab = "", 
+     main = "Performance Gauge: Normalization Methods\n(Score = 100 - penalty from best)", 
+     cex.main = 1.0, font.main = 2)
+
+for (r in seq(0.2, 1, by = 0.2)) {
+  theta <- seq(0, 2*pi, length.out = 100)
+  circle_x <- r * cos(theta)
+  circle_y <- r * sin(theta)
+  lines(circle_x, circle_y, col = "lightgray", lty = 2, lwd = 0.5)
+}
+
+for (angle in angles) {
+  lines(c(0, 1.1*cos(angle)), c(0, 1.1*sin(angle)), col = "lightgray", lty = 3, lwd = 0.5)
+}
+colors <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00")
+radial_coords <- (mae_score / 100) * 0.95  # Scale to fit
+for (i in 1:n_methods) {
+  x_end <- radial_coords[i] * cos(angles[i])
+  y_end <- radial_coords[i] * sin(angles[i])
+  polygon(
+    c(0, x_end, x_end * 0.95),
+    c(0, y_end, y_end * 0.95),
+    col = adjustcolor(colors[i], alpha.f = 0.6),
+    border = colors[i],
+    lwd = 2.5
+  )
+  points(x_end, y_end, pch = 21, bg = colors[i], col = "black", cex = 2.5, lwd = 2)
+  label_offset <- 1.3  # Increased from 1.2
+  label_x <- label_offset * cos(angles[i])
+  label_y <- label_offset * sin(angles[i])
+  text(label_x, label_y,
+       paste0(methods[i], "\n", round(mae_score[i], 1)),
+       cex = 0.8, font = 1, adj = 0.5)
+}
+text(0, 0, "RepeatedCV", cex = 0.85, font = 2, adj = 0.5)
+
+#PANEL 2
+
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10), 
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Detailed Performance Metrics\n(Lower MAE is Better)", 
+     cex.main = 1.0, font.main = 2)
+
+#Draw boxes for each method
+box_width <- 1.8
+box_height <- 1.4
+starting_y <- 8.5
+
+for (i in 1:n_methods) {
+  x_pos <- 1 + ((i - 1) %% 3) * 3
+  y_pos <- starting_y - (floor((i - 1) / 3) * 2.2)
+  rect(x_pos - box_width/2, y_pos - box_height/2, 
+       x_pos + box_width/2, y_pos + box_height/2,
+       col = adjustcolor(colors[i], alpha.f = 0.15),
+       border = colors[i], lwd = 2.5)
+  text(x_pos, y_pos + 0.45, methods[i], 
+       cex = 0.95, font = 2, adj = 0.5)
+  text(x_pos, y_pos + 0.05, sprintf("MAE: %.4f", mae_values[i]),
+       cex = 0.85, font = ifelse(mae_values[i] == best_mae, 2, 1), 
+       col = ifelse(mae_values[i] == best_mae, "darkgreen", colors[i]), adj = 0.5)
+  text(x_pos, y_pos - 0.35, sprintf("RMSE: %.4f", rmse_values[i]),
+       cex = 0.75, col = "darkgray", adj = 0.5)
+}
+
+
+# SUMMARY TEXT
+best_method <- comparison_results$Method[1]
+best_mae <- comparison_results$MAE[1]
+worst_mae <- comparison_results$MAE[n_methods]
+spread <- worst_mae - best_mae
+
+# Add overall title
+mtext(sprintf("Normalization Methods Performance: RepeatedCV (100 folds, 1 repeat)\nBest: %s (MAE: %.4f) | Spread: %.6f", 
+              best_method, best_mae, spread),
+      side = 3, outer = TRUE, cex = 1.1, font = 2, line = 0.5)
+
+print(comparison_results)
+
+
+
+
+
+
+
+
+
+
+
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+#This is the first and less computationally intensive LOCV Takes Approximately 20 minutes with 32GB RAM
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+#Leave one out CV
+set.seed(1)
+
+train_control_LOOCV <- trainControl(
+  method = "LOOCV",
+  summaryFunction = defaultSummary
+)
+
+#z-score
+X_zscore_LOOCV <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore_LOOCV <- normalized_abalone$Age
+data_ml_zscore_LOOCV <- data.frame(Age = y_zscore_LOOCV, X_zscore_LOOCV)
+
+model_zscore_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_zscore_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax_LOOCV <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax_LOOCV <- minmax_abalone$Age
+data_ml_minmax_LOOCV <- data.frame(Age = y_minmax_LOOCV, X_minmax_LOOCV)
+
+model_minmax_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_minmax_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#unitscaling
+X_unitscale_LOOCV <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale_LOOCV <- unitscale_abalone$Age
+data_ml_unitscale_LOOCV <- data.frame(Age = y_unitscale_LOOCV, X_unitscale_LOOCV)
+
+model_unitscale_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_unitscale_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling_LOOCV <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling_LOOCV <- robustscaling_abalone$Age
+data_ml_robustscaling_LOOCV <- data.frame(Age = y_robustscaling_LOOCV, X_robustscaling_LOOCV)
+
+model_robustscaling_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#raw data
+X_raw_LOOCV <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw_LOOCV <- Variables$Age
+data_ml_raw_LOOCV <- data.frame(Age = y_raw_LOOCV, X_raw_LOOCV)
+
+model_raw_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_raw_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#comparison chart
+comparison_results_LOOCV <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    model_raw_LOOCV$results$MAE,
+    model_zscore_LOOCV$results$MAE,
+    model_minmax_LOOCV$results$MAE,
+    model_unitscale_LOOCV$results$MAE,
+    model_robustscaling_LOOCV$results$MAE
+  ),
+  RMSE = c(
+    model_raw_LOOCV$results$RMSE,
+    model_zscore_LOOCV$results$RMSE,
+    model_minmax_LOOCV$results$RMSE,
+    model_unitscale_LOOCV$results$RMSE,
+    model_robustscaling_LOOCV$results$RMSE
+  ),
+  stringsAsFactors = FALSE
+)
+
+comparison_results_LOOCV <- comparison_results_LOOCV[order(comparison_results_LOOCV$MAE), ]
+print(comparison_results_LOOCV)
+
+best_method_LOOCV <- comparison_results_LOOCV$Method[1]
+print(best_method_LOOCV)
+
+
+#Third Evaluation Models:(normalizing the variable measurements) 
+#Z-Score normalization
+normalized_abalone <- Variables
+
+#mm
+normalized_abalone$Length <- scale(Variables$Length)[,1]
+normalized_abalone$Diameter <- scale(Variables$Diameter)[,1]
+normalized_abalone$Height <- scale(Variables$Height)[,1]
+#grams
+normalized_abalone$Whole_weight <- scale(Variables$Whole_weight)[,1]
+normalized_abalone$Shucked_Weight <- scale(Variables$Shucked_Weight)[,1]
+normalized_abalone$Viscera_Weight <- scale(Variables$Viscera_Weight)[,1]
+normalized_abalone$Shell_Weight <- scale(Variables$Shell_Weight)[,1]
+
+set.seed(1)
+
+indicesIndices_norm = sample(seq(1:length(normalized_abalone$Age)),round(.7*length(normalized_abalone$Age)))
+
+trainIndices_norm = normalized_abalone[indicesIndices_norm,]
+testIndices_norm = normalized_abalone[-indicesIndices_norm,]
+
+#Min-Max normalize dimensional variables
+minmax_abalone <- Variables
+
+#mm
+minmax_abalone$Length <- (Variables$Length - min(Variables$Length)) / (max(Variables$Length) - min(Variables$Length))
+minmax_abalone$Diameter <- (Variables$Diameter - min(Variables$Diameter)) / (max(Variables$Diameter) - min(Variables$Diameter))
+minmax_abalone$Height <- (Variables$Height - min(Variables$Height)) / (max(Variables$Height) - min(Variables$Height))
+
+#grams
+minmax_abalone$Whole_weight <- (Variables$Whole_weight - min(Variables$Whole_weight)) / (max(Variables$Whole_weight) - min(Variables$Whole_weight))
+minmax_abalone$Shucked_Weight <- (Variables$Shucked_Weight - min(Variables$Shucked_Weight)) / (max(Variables$Shucked_Weight) - min(Variables$Shucked_Weight))
+minmax_abalone$Viscera_Weight <- (Variables$Viscera_Weight - min(Variables$Viscera_Weight)) / (max(Variables$Viscera_Weight) - min(Variables$Viscera_Weight))
+minmax_abalone$Shell_Weight <- (Variables$Shell_Weight - min(Variables$Shell_Weight)) / (max(Variables$Shell_Weight) - min(Variables$Shell_Weight))
+
+set.seed(1)
+
+Indices_minmax = sample(seq(1:length(minmax_abalone$Age)),round(.7*length(minmax_abalone$Age)))
+
+trainIndices_minmax = minmax_abalone[Indices_minmax,]
+testIndices_minmax = minmax_abalone[-Indices_minmax,]
+
+#Unit Scale
+unitscale_abalone <- Variables
+
+#mm
+unitscale_abalone$Length <- Variables$Length / max(Variables$Length)
+unitscale_abalone$Diameter <- Variables$Diameter / max(Variables$Diameter)
+unitscale_abalone$Height <- Variables$Height / max(Variables$Height)
+
+#grams
+unitscale_abalone$Whole_weight <- Variables$Whole_weight / max(Variables$Whole_weight)
+unitscale_abalone$Shucked_Weight <- Variables$Shucked_Weight / max(Variables$Shucked_Weight)
+unitscale_abalone$Viscera_Weight <- Variables$Viscera_Weight / max(Variables$Viscera_Weight)
+unitscale_abalone$Shell_Weight <- Variables$Shell_Weight / max(Variables$Shell_Weight)
+
+set.seed(1)
+
+Indices_unitscale = sample(seq(1:length(unitscale_abalone$Age)),round(.7*length(unitscale_abalone$Age)))
+
+trainIndices_unitscale = unitscale_abalone[Indices_unitscale,]
+testIndices_unitscale = unitscale_abalone[-Indices_unitscale,]
+
+#Robust Scaling
+robustscaling_abalone <- Variables
+
+#mm
+robustscaling_abalone$Length <- (Variables$Length - median(Variables$Length)) / (quantile(Variables$Length, 0.75) - quantile(Variables$Length, 0.25))
+robustscaling_abalone$Diameter <- (Variables$Diameter - median(Variables$Diameter)) / (quantile(Variables$Diameter, 0.75) - quantile(Variables$Diameter, 0.25))
+robustscaling_abalone$Height <- (Variables$Height - median(Variables$Height)) / (quantile(Variables$Height, 0.75) - quantile(Variables$Height, 0.25))
+
+#grams
+robustscaling_abalone$Whole_weight <- (Variables$Whole_weight - median(Variables$Whole_weight)) / (quantile(Variables$Whole_weight, 0.75) - quantile(Variables$Whole_weight, 0.25))
+robustscaling_abalone$Shucked_Weight <- (Variables$Shucked_Weight - median(Variables$Shucked_Weight)) / (quantile(Variables$Shucked_Weight, 0.75) - quantile(Variables$Shucked_Weight, 0.25))
+robustscaling_abalone$Viscera_Weight <- (Variables$Viscera_Weight - median(Variables$Viscera_Weight)) / (quantile(Variables$Viscera_Weight, 0.75) - quantile(Variables$Viscera_Weight, 0.25))
+robustscaling_abalone$Shell_Weight <- (Variables$Shell_Weight - median(Variables$Shell_Weight)) / (quantile(Variables$Shell_Weight, 0.75) - quantile(Variables$Shell_Weight, 0.25))
+
+set.seed(1)
+
+train_control_cv <- trainControl(
+  method = "repeatedcv",
+  number = 100,
+  repeats = 1,
+  summaryFunction = defaultSummary
+)
+X_zscore <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore <- normalized_abalone$Age
+data_ml_zscore <- data.frame(Age = y_zscore, X_zscore)
+
+model_zscore_cv <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax <- minmax_abalone$Age
+data_ml_minmax <- data.frame(Age = y_minmax, X_minmax)
+
+model_minmax_cv <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#unitscaling
+X_unitscale <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale <- unitscale_abalone$Age
+data_ml_unitscale <- data.frame(Age = y_unitscale, X_unitscale)
+
+model_unitscale_cv <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling <- robustscaling_abalone$Age
+data_ml_robustscaling <- data.frame(Age = y_robustscaling, X_robustscaling)
+
+model_robustscaling_cv <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#raw data
+X_raw <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw <- Variables$Age
+data_ml_raw <- data.frame(Age = y_raw, X_raw)
+
+model_raw_cv <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "lm",
+  trControl = train_control_cv,
+  metric = "MAE"
+)
+
+#comparison chart
+comparison_results <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    model_raw_cv$results$MAE,
+    model_zscore_cv$results$MAE,
+    model_minmax_cv$results$MAE,
+    model_unitscale_cv$results$MAE,
+    model_robustscaling_cv$results$MAE
+  ),
+  RMSE = c(
+    model_raw_cv$results$RMSE,
+    model_zscore_cv$results$RMSE,
+    model_minmax_cv$results$RMSE,
+    model_unitscale_cv$results$RMSE,
+    model_robustscaling_cv$results$RMSE
+  ),
+  stringsAsFactors = FALSE
+)
+
+comparison_results <- comparison_results[order(comparison_results$MAE), ]
+print(comparison_results)
+
+best_method <- comparison_results$Method[1]
+print(best_method)
+
+#Disclaimer... this is the first LOCV code.. it takes approximately 20 MIN. for my HP OMEN with 32GB of RAM
+
+#Leave one out CV
+set.seed(1)
+
+train_control_LOOCV <- trainControl(
+  method = "LOOCV",
+  summaryFunction = defaultSummary
+)
+
+#z-score
+X_zscore_LOOCV <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore_LOOCV <- normalized_abalone$Age
+data_ml_zscore_LOOCV <- data.frame(Age = y_zscore_LOOCV, X_zscore_LOOCV)
+
+model_zscore_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_zscore_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax_LOOCV <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax_LOOCV <- minmax_abalone$Age
+data_ml_minmax_LOOCV <- data.frame(Age = y_minmax_LOOCV, X_minmax_LOOCV)
+
+model_minmax_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_minmax_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#unitscaling
+X_unitscale_LOOCV <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale_LOOCV <- unitscale_abalone$Age
+data_ml_unitscale_LOOCV <- data.frame(Age = y_unitscale_LOOCV, X_unitscale_LOOCV)
+
+model_unitscale_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_unitscale_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling_LOOCV <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling_LOOCV <- robustscaling_abalone$Age
+data_ml_robustscaling_LOOCV <- data.frame(Age = y_robustscaling_LOOCV, X_robustscaling_LOOCV)
+
+model_robustscaling_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+
+#raw data
+X_raw_LOOCV <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw_LOOCV <- Variables$Age
+data_ml_raw_LOOCV <- data.frame(Age = y_raw_LOOCV, X_raw_LOOCV)
+
+model_raw_LOOCV <- train(
+  Age ~ .,
+  data = data_ml_raw_LOOCV,
+  method = "lm",
+  trControl = train_control_LOOCV,
+  metric = "MAE"
+)
+# LEAVE ONE OUT CROSS VALIDATION (LOOCV)
+# 🚨 ============================================================
+#This is the end of the First LOOCV model... the less computationally taxing LOCV model
+
+
+
+#comparison chart
+comparison_results_LOOCV <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    model_raw_LOOCV$results$MAE,
+    model_zscore_LOOCV$results$MAE,
+    model_minmax_LOOCV$results$MAE,
+    model_unitscale_LOOCV$results$MAE,
+    model_robustscaling_LOOCV$results$MAE
+  ),
+  RMSE = c(
+    model_raw_LOOCV$results$RMSE,
+    model_zscore_LOOCV$results$RMSE,
+    model_minmax_LOOCV$results$RMSE,
+    model_unitscale_LOOCV$results$RMSE,
+    model_robustscaling_LOOCV$results$RMSE
+  ),
+  stringsAsFactors = FALSE
+)
+
+comparison_results_LOOCV <- comparison_results_LOOCV[order(comparison_results_LOOCV$MAE), ]
+print(comparison_results_LOOCV)
+
+best_method_LOOCV <- comparison_results_LOOCV$Method[1]
+print(best_method_LOOCV)
+
+#
+# Load required packages
+if (!require(caret)) install.packages("caret")
+if (!require(Metrics)) install.packages("Metrics")
+if (!require(glmnet)) install.packages("glmnet")
+library(caret)
+library(Metrics)
+library(glmnet)
+
+#🚨 🚨 🚨 🚨 🚨
+#Not LOCV but computationally heavy
+#repeatedCV for MLR, Ridge, Lasso, Elastic Net
+set.seed(1)
+
+train_control <- trainControl(
+  method = "repeatedcv",
+  number = 1,
+  repeats = 1,
+  summaryFunction = defaultSummary
+)
+
+#z-score
+X_zscore <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore <- normalized_abalone$Age
+data_ml_zscore <- data.frame(Age = y_zscore, X_zscore)
+
+model_mlr_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax <- minmax_abalone$Age
+data_ml_minmax <- data.frame(Age = y_minmax, X_minmax)
+
+model_mlr_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#unit-scale
+X_unitscale <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale <- unitscale_abalone$Age
+data_ml_unitscale <- data.frame(Age = y_unitscale, X_unitscale)
+
+model_mlr_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling <- robustscaling_abalone$Age
+data_ml_robustscaling <- data.frame(Age = y_robustscaling, X_robustscaling)
+
+model_mlr_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#raw data
+X_raw <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw <- Variables$Age
+data_ml_raw <- data.frame(Age = y_raw, X_raw)
+
+model_mlr_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+# MLR Comparison
+mlr_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_mlr_raw$results$MAE, na.rm = TRUE),
+    min(model_mlr_zscore$results$MAE, na.rm = TRUE),
+    min(model_mlr_minmax$results$MAE, na.rm = TRUE),
+    min(model_mlr_unitscale$results$MAE, na.rm = TRUE),
+    min(model_mlr_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_mlr_raw$results$RMSE[which.min(model_mlr_raw$results$MAE)],
+    model_mlr_zscore$results$RMSE[which.min(model_mlr_zscore$results$MAE)],
+    model_mlr_minmax$results$RMSE[which.min(model_mlr_minmax$results$MAE)],
+    model_mlr_unitscale$results$RMSE[which.min(model_mlr_unitscale$results$MAE)],
+    model_mlr_robustscaling$results$RMSE[which.min(model_mlr_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+mlr_comparison <- mlr_comparison[order(mlr_comparison$MAE), ]
+print("Multiple Linear Regression Comparison:")
+print(mlr_comparison)
+
+best_mlr_method <- mlr_comparison$Method[1]
+print(best_mlr_method)
+
+# Ridge Comparison
+ridge_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_ridge_raw$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_ridge_raw$results$RMSE[which.min(model_ridge_raw$results$MAE)],
+    model_ridge_zscore$results$RMSE[which.min(model_ridge_zscore$results$MAE)],
+    model_ridge_minmax$results$RMSE[which.min(model_ridge_minmax$results$MAE)],
+    model_ridge_unitscale$results$RMSE[which.min(model_ridge_unitscale$results$MAE)],
+    model_ridge_robustscaling$results$RMSE[which.min(model_ridge_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+ridge_comparison <- ridge_comparison[order(ridge_comparison$MAE), ]
+print("Ridge Regression Comparison:")
+print(ridge_comparison)
+
+best_ridge_method <- ridge_comparison$Method[1]
+print(best_ridge_method)
+
+# Lasso Comparison
+lasso_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_lasso_raw$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_lasso_raw$results$RMSE[which.min(model_lasso_raw$results$MAE)],
+    model_lasso_zscore$results$RMSE[which.min(model_lasso_zscore$results$MAE)],
+    model_lasso_minmax$results$RMSE[which.min(model_lasso_minmax$results$MAE)],
+    model_lasso_unitscale$results$RMSE[which.min(model_lasso_unitscale$results$MAE)],
+    model_lasso_robustscaling$results$RMSE[which.min(model_lasso_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+lasso_comparison <- lasso_comparison[order(lasso_comparison$MAE), ]
+print("Lasso Regression Comparison:")
+print(lasso_comparison)
+
+best_lasso_method <- lasso_comparison$Method[1]
+print(best_lasso_method)
+
+# Elastic Net Comparison
+elasticnet_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_elasticnet_raw$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_elasticnet_raw$results$RMSE[which.min(model_elasticnet_raw$results$MAE)],
+    model_elasticnet_zscore$results$RMSE[which.min(model_elasticnet_zscore$results$MAE)],
+    model_elasticnet_minmax$results$RMSE[which.min(model_elasticnet_minmax$results$MAE)],
+    model_elasticnet_unitscale$results$RMSE[which.min(model_elasticnet_unitscale$results$MAE)],
+    model_elasticnet_robustscaling$results$RMSE[which.min(model_elasticnet_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+elasticnet_comparison <- elasticnet_comparison[order(elasticnet_comparison$MAE), ]
+print("Elastic Net Comparison:")
+print(elasticnet_comparison)
+
+best_elasticnet_method <- elasticnet_comparison$Method[1]
+print(best_elasticnet_method)
+
+# OVERALL MODEL COMPARISON
+overall_comparison <- data.frame(
+  Model = c("MLR", "Ridge", "Lasso", "Elastic Net"),
+  Best_Method = c(
+    mlr_comparison$Method[1],
+    ridge_comparison$Method[1],
+    lasso_comparison$Method[1],
+    elasticnet_comparison$Method[1]
+  ),
+  MAE = c(
+    mlr_comparison$MAE[1],
+    ridge_comparison$MAE[1],
+    lasso_comparison$MAE[1],
+    elasticnet_comparison$MAE[1]
+  ),
+  RMSE = c(
+    mlr_comparison$RMSE[1],
+    ridge_comparison$RMSE[1],
+    lasso_comparison$RMSE[1],
+    elasticnet_comparison$RMSE[1]
+  ),
+  stringsAsFactors = FALSE
+)
+overall_comparison <- overall_comparison[order(overall_comparison$MAE), ]
+print("Overall Model Comparison:Number: 500 Times: 5")
+print(overall_comparison)
+
+
+#This is the most computational Reasonable model that yields the best MAE Results
+#repeatedCV for MLR, Ridge, Lasso, Elastic Net
+set.seed(1)
+
+train_control <- trainControl(
+  method = "repeatedcv",
+  number = 100,
+  repeats = 1,
+  summaryFunction = defaultSummary
+)
+
+#z-score
+X_zscore <- model.matrix(Age ~ ., normalized_abalone)[, -1]
+y_zscore <- normalized_abalone$Age
+data_ml_zscore <- data.frame(Age = y_zscore, X_zscore)
+
+model_mlr_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_zscore <- train(
+  Age ~ .,
+  data = data_ml_zscore,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax <- model.matrix(Age ~ ., minmax_abalone)[, -1]
+y_minmax <- minmax_abalone$Age
+data_ml_minmax <- data.frame(Age = y_minmax, X_minmax)
+
+model_mlr_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_minmax <- train(
+  Age ~ .,
+  data = data_ml_minmax,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#unit-scale
+X_unitscale <- model.matrix(Age ~ ., unitscale_abalone)[, -1]
+y_unitscale <- unitscale_abalone$Age
+data_ml_unitscale <- data.frame(Age = y_unitscale, X_unitscale)
+
+model_mlr_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_unitscale <- train(
+  Age ~ .,
+  data = data_ml_unitscale,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling <- model.matrix(Age ~ ., robustscaling_abalone)[, -1]
+y_robustscaling <- robustscaling_abalone$Age
+data_ml_robustscaling <- data.frame(Age = y_robustscaling, X_robustscaling)
+
+model_mlr_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_robustscaling <- train(
+  Age ~ .,
+  data = data_ml_robustscaling,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#raw data
+X_raw <- model.matrix(Age ~ ., Variables)[, -1]
+y_raw <- Variables$Age
+data_ml_raw <- data.frame(Age = y_raw, X_raw)
+
+model_mlr_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_raw <- train(
+  Age ~ .,
+  data = data_ml_raw,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+# MLR Comparison
+mlr_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_mlr_raw$results$MAE, na.rm = TRUE),
+    min(model_mlr_zscore$results$MAE, na.rm = TRUE),
+    min(model_mlr_minmax$results$MAE, na.rm = TRUE),
+    min(model_mlr_unitscale$results$MAE, na.rm = TRUE),
+    min(model_mlr_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_mlr_raw$results$RMSE[which.min(model_mlr_raw$results$MAE)],
+    model_mlr_zscore$results$RMSE[which.min(model_mlr_zscore$results$MAE)],
+    model_mlr_minmax$results$RMSE[which.min(model_mlr_minmax$results$MAE)],
+    model_mlr_unitscale$results$RMSE[which.min(model_mlr_unitscale$results$MAE)],
+    model_mlr_robustscaling$results$RMSE[which.min(model_mlr_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+mlr_comparison <- mlr_comparison[order(mlr_comparison$MAE), ]
+print("Multiple Linear Regression Comparison:")
+print(mlr_comparison)
+
+best_mlr_method <- mlr_comparison$Method[1]
+print(best_mlr_method)
+
+# Ridge Comparison
+ridge_viz <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_ridge_raw$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+barplot_ridge <- barplot(ridge_viz$MAE,
+                         names.arg = ridge_viz$Method,
+                         ylab = "MAE (Mean Absolute Error)",
+                         xlab = "",
+                         main = "RIDGE Model - Normalization Methods Comparison",
+                         col = "tomato",
+                         ylim = c(min(ridge_viz$MAE) - 0.001, max(ridge_viz$MAE) + 0.002),
+                         cex.names = 0.9)
+
+text(barplot_ridge, ridge_viz$MAE + 0.0001, 
+     paste0(round(ridge_viz$MAE, 4)), 
+     pos = 3, 
+     cex = 0.9,
+     font = 2)
+
+print(ridge_viz)
+best_ridge_method <- ridge_comparison$Method[1]
+print(best_ridge_method)
+
+# Lasso Comparison
+lasso_viz <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_lasso_raw$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+barplot_lasso <- barplot(lasso_viz$MAE,
+                         names.arg = lasso_viz$Method,
+                         ylab = "MAE (Mean Absolute Error)",
+                         xlab = "",
+                         main = "LASSO Model - Normalization Methods Comparison",
+                         col = "mediumseagreen",
+                         ylim = c(min(lasso_viz$MAE) - 0.001, max(lasso_viz$MAE) + 0.002),
+                         cex.names = 0.9)
+
+text(barplot_lasso, lasso_viz$MAE + 0.0001, 
+     paste0(round(lasso_viz$MAE, 4)), 
+     pos = 3, 
+     cex = 0.9,
+     font = 2)
+
+print(lasso_viz)
+
+# Elastic Net Comparison
+elasticnet_viz <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_elasticnet_raw$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+barplot_elasticnet <- barplot(elasticnet_viz$MAE,
+                              names.arg = elasticnet_viz$Method,
+                              ylab = "MAE (Mean Absolute Error)",
+                              xlab = "",
+                              main = "ELASTIC NET Model - Normalization Methods Comparison",
+                              col = "mediumpurple",
+                              ylim = c(min(elasticnet_viz$MAE) - 0.001, max(elasticnet_viz$MAE) + 0.002),
+                              cex.names = 0.9)
+
+text(barplot_elasticnet, elasticnet_viz$MAE + 0.0001, 
+     paste0(round(elasticnet_viz$MAE, 4)), 
+     pos = 3, 
+     cex = 0.9,
+     font = 2)
+
+print("ELASTIC NET Model Results:")
+print(elasticnet_viz)
+
+# OVERALL MODEL COMPARISON
+overall_comparison <- data.frame(
+  Model = c("MLR", "Ridge", "Lasso", "Elastic Net"),
+  Best_Method = c(
+    mlr_comparison$Method[1],
+    ridge_comparison$Method[1],
+    lasso_comparison$Method[1],
+    elasticnet_comparison$Method[1]
+  ),
+  MAE = c(
+    mlr_comparison$MAE[1],
+    ridge_comparison$MAE[1],
+    lasso_comparison$MAE[1],
+    elasticnet_comparison$MAE[1]
+  ),
+  RMSE = c(
+    mlr_comparison$RMSE[1],
+    ridge_comparison$RMSE[1],
+    lasso_comparison$RMSE[1],
+    elasticnet_comparison$RMSE[1]
+  ),
+  stringsAsFactors = FALSE
+)
+overall_comparison <- overall_comparison[order(overall_comparison$MAE), ]
+print("Overall Model Comparison (Best Performing): Number: 100 Times: 1")
+print(overall_comparison)
+
+#Visualizations for most practical and best all around models
+#MLR VIsualization
+mlr_viz <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_mlr_raw$results$MAE, na.rm = TRUE),
+    min(model_mlr_zscore$results$MAE, na.rm = TRUE),
+    min(model_mlr_minmax$results$MAE, na.rm = TRUE),
+    min(model_mlr_unitscale$results$MAE, na.rm = TRUE),
+    min(model_mlr_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+barplot_mlr <- barplot(mlr_viz$MAE,
+                       names.arg = mlr_viz$Method,
+                       ylab = "MAE (Mean Absolute Error)",
+                       xlab = "",
+                       main = "MLR Model - Normalization Methods Comparison",
+                       col = "steelblue",
+                       ylim = c(1.442, 1.444),
+                       cex.names = 0.9)
+
+# Add labels above each bar with MAE values
+text(barplot_mlr, mlr_viz$MAE + 0.0001, 
+     paste0(round(mlr_viz$MAE, 4)), 
+     pos = 3, 
+     cex = 0.9,
+     font = 2)
+
+print(mlr_viz)
+
+
+
+# RIDGE MODEL VISUALIZATION - Bar Chart with Zoomed Scale
+ridge_viz <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_ridge_raw$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+barplot_ridge <- barplot(ridge_viz$MAE,
+                         names.arg = ridge_viz$Method,
+                         ylab = "MAE (Mean Absolute Error)",
+                         xlab = "Normalization Method",
+                         main = "RIDGE Model - Normalization Methods Comparison",
+                         col = "tomato",
+                         ylim = c(min(ridge_viz$MAE) - 0.001, max(ridge_viz$MAE) + 0.002),
+                         cex.names = 0.9)
+
+text(barplot_ridge, ridge_viz$MAE + 0.0001, 
+     paste0(round(ridge_viz$MAE, 4)), 
+     pos = 3, 
+     cex = 0.9,
+     font = 2)
+
+
+print(ridge_viz)
+
+#Ridge model visualization
+ridge_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_ridge_raw$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_ridge_raw$results$RMSE[which.min(model_ridge_raw$results$MAE)],
+    model_ridge_zscore$results$RMSE[which.min(model_ridge_zscore$results$MAE)],
+    model_ridge_minmax$results$RMSE[which.min(model_ridge_minmax$results$MAE)],
+    model_ridge_unitscale$results$RMSE[which.min(model_ridge_unitscale$results$MAE)],
+    model_ridge_robustscaling$results$RMSE[which.min(model_ridge_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+
+ridge_comparison <- ridge_comparison[order(ridge_comparison$MAE), ]
+
+plot(ridge_comparison$MAE,
+     ylab = "MAE (Mean Absolute Error)",
+     xlab = "Normalization Method",
+     type = "o",
+     xlim = c(0.5, 5.5),
+     ylim = c(min(ridge_comparison$MAE) - 0.01, max(ridge_comparison$MAE) + 0.01),
+     main = "RIDGE Model - Normalization Methods Comparison",
+     pch = 16,
+     cex = 1.2,
+     col = "red",
+     xaxt = "n")
+
+axis(1, at = 1:5, labels = ridge_comparison$Method)
+
+lines(ridge_comparison$MAE, col = "red", type = "o", pch = 16, cex = 1.2)
+
+legend("topleft",
+       legend = c(
+         paste0(ridge_comparison$Method[1], " (MAE: ", round(ridge_comparison$MAE[1], 4), ")"),
+         paste0(ridge_comparison$Method[2], " (MAE: ", round(ridge_comparison$MAE[2], 4), ")"),
+         paste0(ridge_comparison$Method[3], " (MAE: ", round(ridge_comparison$MAE[3], 4), ")"),
+         paste0(ridge_comparison$Method[4], " (MAE: ", round(ridge_comparison$MAE[4], 4), ")"),
+         paste0(ridge_comparison$Method[5], " (MAE: ", round(ridge_comparison$MAE[5], 4), ")")
+       ),
+       col = c("red", "red", "red", "red", "red"),
+       lty = 1,
+       pch = 16,
+       cex = 0.8)
+
+print("RIDGE Model Results:")
+print(ridge_comparison)
+#Lasso Model Visualization
+lasso_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_lasso_raw$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_lasso_raw$results$RMSE[which.min(model_lasso_raw$results$MAE)],
+    model_lasso_zscore$results$RMSE[which.min(model_lasso_zscore$results$MAE)],
+    model_lasso_minmax$results$RMSE[which.min(model_lasso_minmax$results$MAE)],
+    model_lasso_unitscale$results$RMSE[which.min(model_lasso_unitscale$results$MAE)],
+    model_lasso_robustscaling$results$RMSE[which.min(model_lasso_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+
+lasso_comparison <- lasso_comparison[order(lasso_comparison$MAE), ]
+
+plot(lasso_comparison$MAE,
+     ylab = "MAE (Mean Absolute Error)",
+     xlab = "Normalization Method",
+     type = "o",
+     xlim = c(0.5, 5.5),
+     ylim = c(min(lasso_comparison$MAE) - 0.01, max(lasso_comparison$MAE) + 0.01),
+     main = "LASSO Model - Normalization Methods Comparison",
+     pch = 16,
+     cex = 1.2,
+     col = "green",
+     xaxt = "n")
+
+axis(1, at = 1:5, labels = lasso_comparison$Method)
+
+lines(lasso_comparison$MAE, col = "green", type = "o", pch = 16, cex = 1.2)
+
+legend("topleft",
+       legend = c(
+         paste0(lasso_comparison$Method[1], " (MAE: ", round(lasso_comparison$MAE[1], 4), ")"),
+         paste0(lasso_comparison$Method[2], " (MAE: ", round(lasso_comparison$MAE[2], 4), ")"),
+         paste0(lasso_comparison$Method[3], " (MAE: ", round(lasso_comparison$MAE[3], 4), ")"),
+         paste0(lasso_comparison$Method[4], " (MAE: ", round(lasso_comparison$MAE[4], 4), ")"),
+         paste0(lasso_comparison$Method[5], " (MAE: ", round(lasso_comparison$MAE[5], 4), ")")
+       ),
+       col = c("green", "green", "green", "green", "green"),
+       lty = 1,
+       pch = 16,
+       cex = 0.8)
+
+print(lasso_comparison)
+
+#Elastic Net Model Visualization
+elasticnet_comparison <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_elasticnet_raw$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_elasticnet_raw$results$RMSE[which.min(model_elasticnet_raw$results$MAE)],
+    model_elasticnet_zscore$results$RMSE[which.min(model_elasticnet_zscore$results$MAE)],
+    model_elasticnet_minmax$results$RMSE[which.min(model_elasticnet_minmax$results$MAE)],
+    model_elasticnet_unitscale$results$RMSE[which.min(model_elasticnet_unitscale$results$MAE)],
+    model_elasticnet_robustscaling$results$RMSE[which.min(model_elasticnet_robustscaling$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+
+elasticnet_comparison <- elasticnet_comparison[order(elasticnet_comparison$MAE), ]
+
+plot(elasticnet_comparison$MAE,
+     ylab = "MAE (Mean Absolute Error)",
+     xlab = "Normalization Method",
+     type = "o",
+     xlim = c(0.5, 5.5),
+     ylim = c(min(elasticnet_comparison$MAE) - 0.01, max(elasticnet_comparison$MAE) + 0.01),
+     main = "ELASTIC NET Model - Normalization Methods Comparison",
+     pch = 16,
+     cex = 1.2,
+     col = "purple",
+     xaxt = "n")
+
+axis(1, at = 1:5, labels = elasticnet_comparison$Method)
+
+lines(elasticnet_comparison$MAE, col = "purple", type = "o", pch = 16, cex = 1.2)
+
+legend("topleft",
+       legend = c(
+         paste0(elasticnet_comparison$Method[1], " (MAE: ", round(elasticnet_comparison$MAE[1], 4), ")"),
+         paste0(elasticnet_comparison$Method[2], " (MAE: ", round(elasticnet_comparison$MAE[2], 4), ")"),
+         paste0(elasticnet_comparison$Method[3], " (MAE: ", round(elasticnet_comparison$MAE[3], 4), ")"),
+         paste0(elasticnet_comparison$Method[4], " (MAE: ", round(elasticnet_comparison$MAE[4], 4), ")"),
+         paste0(elasticnet_comparison$Method[5], " (MAE: ", round(elasticnet_comparison$MAE[5], 4), ")")
+       ),
+       col = c("purple", "purple", "purple", "purple", "purple"),
+       lty = 1,
+       pch = 16,
+       cex = 0.8)
+
+print(elasticnet_comparison)
+
+
+#presentation visualization
+# Master results: All combinations
+master_results <- data.frame(
+  Model = rep(c("MLR", "Ridge", "Lasso", "Elastic Net"), 5),
+  Normalization = c(
+    rep("Z-Score", 4), rep("Min-Max", 4), rep("Unit Scaling", 4),
+    rep("Robust Scaling", 4), rep("Raw Data", 4)
+  ),
+  MAE = c(
+    # Z-Score
+    min(model_mlr_zscore_log$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore_log$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore_log$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore_log$results$MAE, na.rm = TRUE),
+    # Min-Max
+    min(model_mlr_minmax_log$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax_log$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax_log$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax_log$results$MAE, na.rm = TRUE),
+    # Unit Scaling
+    min(model_mlr_unitscale_log$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale_log$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale_log$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale_log$results$MAE, na.rm = TRUE),
+    # Robust Scaling
+    min(model_mlr_robustscaling_log$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling_log$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling_log$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling_log$results$MAE, na.rm = TRUE),
+    # Raw Data
+    min(model_mlr_raw_log$results$MAE, na.rm = TRUE),
+    min(model_ridge_raw_log$results$MAE, na.rm = TRUE),
+    min(model_lasso_raw_log$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_raw_log$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Find overall winner
+# COMPILE RESULTS
+
+
+# Master results: All 20 combinations (4 models x 5 normalizations)
+master_results <- data.frame(
+  Model = rep(c("MLR", "Ridge", "Lasso", "Elastic Net"), 5),
+  Normalization = c(
+    rep("Z-Score", 4), rep("Min-Max", 4), rep("Unit Scaling", 4),
+    rep("Robust Scaling", 4), rep("Raw Data", 4)
+  ),
+  MAE = c(
+    # Z-Score
+    min(model_mlr_zscore$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore$results$MAE, na.rm = TRUE),
+    # Min-Max
+    min(model_mlr_minmax$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax$results$MAE, na.rm = TRUE),
+    # Unit Scaling
+    min(model_mlr_unitscale$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale$results$MAE, na.rm = TRUE),
+    # Robust Scaling
+    min(model_mlr_robustscaling$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling$results$MAE, na.rm = TRUE),
+    # Raw Data
+    min(model_mlr_raw$results$MAE, na.rm = TRUE),
+    min(model_ridge_raw$results$MAE, na.rm = TRUE),
+    min(model_lasso_raw$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_raw$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+
+# COMPUTE RANKINGS
+
+
+# Top 5 combinations (by MAE)
+top_5_combos <- master_results[order(master_results$MAE), ][1:5, ]
+
+# Best normalization method (average MAE across all 4 models)
+norm_by_method <- aggregate(MAE ~ Normalization, data = master_results, FUN = mean)
+norm_by_method <- norm_by_method[order(norm_by_method$MAE), ]
+best_norm <- norm_by_method[1, ]
+
+# Best model type (average MAE across all 5 normalizations)
+model_by_type <- aggregate(MAE ~ Model, data = master_results, FUN = mean)
+model_by_type <- model_by_type[order(model_by_type$MAE), ]
+best_model <- model_by_type[1, ]
+
+
+# VISUALIZATION (4 Panels)
+
+par(mfrow = c(2, 2), mar = c(0.5, 0.5, 1.5, 0.5), oma = c(0, 0, 1.8, 0))
+
+# Color schemes
+colors_5 <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E")
+model_color_map <- list(
+  "MLR" = "#1B9E77",
+  "Ridge" = "#D95F02",
+  "Lasso" = "#7570B3",
+  "Elastic Net" = "#E7298A"
+)
+
+#PANEL 1: Top 5 Rankings
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10.5),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Top 5 Model + Normalization Combinations", 
+     cex.main = 1.1, font.main = 2)
+
+y_start <- 10
+rank_box_height <- 1.9
+
+for (i in 1:5) {
+  y_pos <- y_start - (i - 1) * rank_box_height
+  
+  model_col <- as.character(top_5_combos$Model[i])
+  box_color <- model_color_map[[model_col]]
+  
+  rect(0.2, y_pos - 1.6, 9.8, y_pos,
+       col = adjustcolor(box_color, alpha.f = 0.2),
+       border = box_color, lwd = 2.5)
+  
+  text(0.7, y_pos - 0.8, as.character(i),
+       cex = 2.2, font = 2, col = box_color, adj = 0.5)
+  
+  text(2.0, y_pos - 0.3, sprintf("%s", top_5_combos$Model[i]),
+       cex = 1.05, font = 2, adj = 0)
+  
+  text(2.0, y_pos - 0.85, sprintf("%s", top_5_combos$Normalization[i]),
+       cex = 0.9, font = 1, col = "#333333", adj = 0)
+  
+  text(9.3, y_pos - 0.55, sprintf("%.4f", top_5_combos$MAE[i]),
+       cex = 1.0, font = 2, col = box_color, adj = 1)
+}
+
+#PANEL 2: Best Normalization Method
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Best Normalization Method",
+     cex.main = 1.1, font.main = 2)
+
+# Large winner card
+rect(0.3, 1.0, 9.7, 9.2,
+     col = adjustcolor("#4CAF50", alpha.f = 0.12),
+     border = "#4CAF50", lwd = 3.5)
+
+text(5, 8.5, "BEST NORMALIZATION", 
+     cex = 1.0, font = 2, col = "#2E7D32", adj = 0.5)
+
+text(5, 7.3, best_norm$Normalization,
+     cex = 1.7, font = 2, adj = 0.5)
+
+text(5, 6.1, sprintf("Average MAE: %.4f", best_norm$MAE),
+     cex = 1.0, font = 2, col = "#2E7D32", adj = 0.5)
+
+lines(c(1.5, 8.5), c(5.5, 5.5), col = "#4CAF50", lwd = 1.5, lty = 2)
+
+best_norm_data <- master_results[master_results$Normalization == best_norm$Normalization, ]
+best_norm_data <- best_norm_data[order(best_norm_data$MAE), ]
+
+text(5, 4.8, "Performance by Model:", cex = 0.9, font = 2, adj = 0.5)
+
+for (j in 1:min(4, nrow(best_norm_data))) {
+  model_name <- best_norm_data$Model[j]
+  mae_val <- best_norm_data$MAE[j]
+  text(5, 4.2 - (j-1)*0.4, 
+       sprintf("%d. %s (MAE: %.4f)", j, model_name, mae_val),
+       cex = 0.85, font = 1, adj = 0.5)
+}
+
+#PANEL 3: Best Model Type
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Best Model Type",
+     cex.main = 1.1, font.main = 2)
+
+# Large winner box
+rect(0.3, 1.0, 9.7, 9.2,
+     col = adjustcolor("#2196F3", alpha.f = 0.12),
+     border = "#2196F3", lwd = 3.5)
+
+text(5, 8.5, "BEST MODEL", 
+     cex = 1.0, font = 2, col = "#0D47A1", adj = 0.5)
+
+text(5, 7.3, best_model$Model,
+     cex = 1.7, font = 2, adj = 0.5)
+
+text(5, 6.1, sprintf("Average MAE: %.4f", best_model$MAE),
+     cex = 1.0, font = 2, col = "#0D47A1", adj = 0.5)
+
+lines(c(1.5, 8.5), c(5.5, 5.5), col = "#2196F3", lwd = 1.5, lty = 2)
+
+best_model_data <- master_results[master_results$Model == best_model$Model, ]
+best_model_data <- best_model_data[order(best_model_data$MAE), ]
+
+text(5, 4.8, "Performance by Normalization:", cex = 0.9, font = 2, adj = 0.5)
+
+for (j in 1:min(4, nrow(best_model_data))) {
+  norm_name <- best_model_data$Normalization[j]
+  mae_val <- best_model_data$MAE[j]
+  text(5, 4.2 - (j-1)*0.4, 
+       sprintf("%d. %s (MAE: %.4f)", j, norm_name, mae_val),
+       cex = 0.85, font = 1, adj = 0.5)
+}
+
+#PANEL 4: Comparative Metrics
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Performance Summary",
+     cex.main = 1.1, font.main = 2)
+
+# Overall best combo
+best_combo <- master_results[which.min(master_results$MAE), ]
+worst_combo <- master_results[which.max(master_results$MAE), ]
+
+# Best combo
+rect(0.3, 6.8, 9.7, 9.2,
+     col = adjustcolor("#4CAF50", alpha.f = 0.15),
+     border = "#4CAF50", lwd = 2.5)
+text(0.7, 8.7, "Best Combination:", cex = 0.95, font = 2, adj = 0)
+text(0.7, 8.1, sprintf("%s + %s", best_combo$Model, best_combo$Normalization), 
+     cex = 0.9, font = 1, adj = 0)
+text(9.3, 7.9, sprintf("MAE: %.4f", best_combo$MAE),
+     cex = 0.95, font = 2, col = "#2E7D32", adj = 1)
+
+# Worst combo
+rect(0.3, 4.0, 9.7, 6.4,
+     col = adjustcolor("#F44336", alpha.f = 0.15),
+     border = "#F44336", lwd = 2.5)
+text(0.7, 5.9, "Worst Combination:", cex = 0.95, font = 2, adj = 0)
+text(0.7, 5.3, sprintf("%s + %s", worst_combo$Model, worst_combo$Normalization), 
+     cex = 0.9, font = 1, adj = 0)
+text(9.3, 5.1, sprintf("MAE: %.4f", worst_combo$MAE),
+     cex = 0.95, font = 2, col = "#C62828", adj = 1)
+
+# Improvement
+improvement <- ((worst_combo$MAE - best_combo$MAE) / best_combo$MAE * 100)
+rect(0.3, 1.5, 9.7, 3.5,
+     col = adjustcolor("#FF9800", alpha.f = 0.15),
+     border = "#FF9800", lwd = 2.5)
+text(5, 3.0, sprintf("Improvement: %.2f%%", improvement),
+     cex = 1.05, font = 2, col = "#E65100", adj = 0.5)
+text(5, 2.1, sprintf("Best outperforms worst by %.4f MAE", worst_combo$MAE - best_combo$MAE),
+     cex = 0.85, font = 1, adj = 0.5)
+
+
+
+#Log weight
+
+
+# ADD LOG-TRANSFORMED WEIGHT FEATURES
+Variables_log <- Variables
+Variables_log$log_Whole_weight <- log1p(Variables_log$Whole_weight)
+Variables_log$log_Shucked_Weight <- log1p(Variables_log$Shucked_Weight)
+Variables_log$log_Viscera_Weight <- log1p(Variables_log$Viscera_Weight)
+Variables_log$log_Shell_Weight <- log1p(Variables_log$Shell_Weight)
+
+normalized_abalone_log <- normalized_abalone
+normalized_abalone_log$log_Whole_weight <- log1p(normalized_abalone_log$Whole_weight)
+normalized_abalone_log$log_Shucked_Weight <- log1p(normalized_abalone_log$Shucked_Weight)
+normalized_abalone_log$log_Viscera_Weight <- log1p(normalized_abalone_log$Viscera_Weight)
+normalized_abalone_log$log_Shell_Weight <- log1p(normalized_abalone_log$Shell_Weight)
+
+minmax_abalone_log <- minmax_abalone
+minmax_abalone_log$log_Whole_weight <- log1p(minmax_abalone_log$Whole_weight)
+minmax_abalone_log$log_Shucked_Weight <- log1p(minmax_abalone_log$Shucked_Weight)
+minmax_abalone_log$log_Viscera_Weight <- log1p(minmax_abalone_log$Viscera_Weight)
+minmax_abalone_log$log_Shell_Weight <- log1p(minmax_abalone_log$Shell_Weight)
+
+unitscale_abalone_log <- unitscale_abalone
+unitscale_abalone_log$log_Whole_weight <- log1p(unitscale_abalone_log$Whole_weight)
+unitscale_abalone_log$log_Shucked_Weight <- log1p(unitscale_abalone_log$Shucked_Weight)
+unitscale_abalone_log$log_Viscera_Weight <- log1p(unitscale_abalone_log$Viscera_Weight)
+unitscale_abalone_log$log_Shell_Weight <- log1p(unitscale_abalone_log$Shell_Weight)
+
+robustscaling_abalone_log <- robustscaling_abalone
+robustscaling_abalone_log$log_Whole_weight <- log1p(robustscaling_abalone_log$Whole_weight)
+robustscaling_abalone_log$log_Shucked_Weight <- log1p(robustscaling_abalone_log$Shucked_Weight)
+robustscaling_abalone_log$log_Viscera_Weight <- log1p(robustscaling_abalone_log$Viscera_Weight)
+robustscaling_abalone_log$log_Shell_Weight <- log1p(robustscaling_abalone_log$Shell_Weight)
+
+# REMOVE NAs
+Variables_log <- Variables_log[complete.cases(Variables_log), ]
+normalized_abalone_log <- normalized_abalone_log[complete.cases(normalized_abalone_log), ]
+minmax_abalone_log <- minmax_abalone_log[complete.cases(minmax_abalone_log), ]
+unitscale_abalone_log <- unitscale_abalone_log[complete.cases(unitscale_abalone_log), ]
+robustscaling_abalone_log <- robustscaling_abalone_log[complete.cases(robustscaling_abalone_log), ]
+
+# REMOVE ORIGINAL WEIGHT VARIABLES
+Variables_log <- Variables_log[, -which(names(Variables_log) %in% c("Whole_weight", "Shucked_Weight", "Viscera_Weight", "Shell_Weight"))]
+normalized_abalone_log <- normalized_abalone_log[, -which(names(normalized_abalone_log) %in% c("Whole_weight", "Shucked_Weight", "Viscera_Weight", "Shell_Weight"))]
+minmax_abalone_log <- minmax_abalone_log[, -which(names(minmax_abalone_log) %in% c("Whole_weight", "Shucked_Weight", "Viscera_Weight", "Shell_Weight"))]
+unitscale_abalone_log <- unitscale_abalone_log[, -which(names(unitscale_abalone_log) %in% c("Whole_weight", "Shucked_Weight", "Viscera_Weight", "Shell_Weight"))]
+robustscaling_abalone_log <- robustscaling_abalone_log[, -which(names(robustscaling_abalone_log) %in% c("Whole_weight", "Shucked_Weight", "Viscera_Weight", "Shell_Weight"))]
+
+
+
+#This is the most computational Reasonable model that yields the best MAE Results
+#repeatedCV for MLR, Ridge, Lasso, Elastic Net
+#This is the most computational Reasonable model that yields the best MAE Results
+#repeatedCV for MLR, Ridge, Lasso, Elastic Net
+#Lets put it all together... the models... the dataset transformations.. the best all around method Repeated CV 100x1 and see what MAE we can produce
+set.seed(1)
+
+train_control <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 10,
+  summaryFunction = defaultSummary
+)
+
+#z-score
+X_zscore_final <- model.matrix(Age ~ ., normalized_abalone_log)[, -1]
+y_zscore_final <- normalized_abalone_log$Age
+data_ml_zscore_final <- data.frame(Age = y_zscore_final, X_zscore_final)
+
+model_mlr_zscore_final <- train(
+  Age ~ .,
+  data = data_ml_zscore_final,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_zscore_final <- train(
+  Age ~ .,
+  data = data_ml_zscore_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_zscore_final <- train(
+  Age ~ .,
+  data = data_ml_zscore_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_zscore_final <- train(
+  Age ~ .,
+  data = data_ml_zscore_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#min-max
+X_minmax_final <- model.matrix(Age ~ ., minmax_abalone_log)[, -1]
+y_minmax_final <- minmax_abalone_log$Age
+data_ml_minmax_final <- data.frame(Age = y_minmax_final, X_minmax_final)
+
+model_mlr_minmax_final <- train(
+  Age ~ .,
+  data = data_ml_minmax_final,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_minmax_final <- train(
+  Age ~ .,
+  data = data_ml_minmax_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_minmax_final <- train(
+  Age ~ .,
+  data = data_ml_minmax_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_minmax_final <- train(
+  Age ~ .,
+  data = data_ml_minmax_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#unit-scale
+X_unitscale_final <- model.matrix(Age ~ ., unitscale_abalone_log)[, -1]
+y_unitscale_final <- unitscale_abalone_log$Age
+data_ml_unitscale_final <- data.frame(Age = y_unitscale_final, X_unitscale_final)
+
+model_mlr_unitscale_final <- train(
+  Age ~ .,
+  data = data_ml_unitscale_final,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_unitscale_final <- train(
+  Age ~ .,
+  data = data_ml_unitscale_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_unitscale_final <- train(
+  Age ~ .,
+  data = data_ml_unitscale_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_unitscale_final <- train(
+  Age ~ .,
+  data = data_ml_unitscale_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#Robust Scaling
+X_robustscaling_final <- model.matrix(Age ~ ., robustscaling_abalone_log)[, -1]
+y_robustscaling_final <- robustscaling_abalone_log$Age
+data_ml_robustscaling_final <- data.frame(Age = y_robustscaling_final, X_robustscaling_final)
+
+model_mlr_robustscaling_final <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_final,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_robustscaling_final <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_robustscaling_final <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_robustscaling_final <- train(
+  Age ~ .,
+  data = data_ml_robustscaling_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+#raw data
+X_raw_final <- model.matrix(Age ~ ., Variables_log)[, -1]
+y_raw_final <- Variables_log$Age
+data_ml_raw_final <- data.frame(Age = y_raw_final, X_raw_final)
+
+model_mlr_raw_final <- train(
+  Age ~ .,
+  data = data_ml_raw_final,
+  method = "lm",
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_ridge_raw_final <- train(
+  Age ~ .,
+  data = data_ml_raw_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_lasso_raw_final <- train(
+  Age ~ .,
+  data = data_ml_raw_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+model_elasticnet_raw_final <- train(
+  Age ~ .,
+  data = data_ml_raw_final,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0.5, lambda = seq(0.01, 1, length = 10)),
+  trControl = train_control,
+  metric = "MAE"
+)
+
+# MLR Comparison
+mlr_comparison_final <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_mlr_raw_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_robustscaling_final$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_mlr_raw_final$results$RMSE[which.min(model_mlr_raw_final$results$MAE)],
+    model_mlr_zscore_final$results$RMSE[which.min(model_mlr_zscore_final$results$MAE)],
+    model_mlr_minmax_final$results$RMSE[which.min(model_mlr_minmax_final$results$MAE)],
+    model_mlr_unitscale_final$results$RMSE[which.min(model_mlr_unitscale_final$results$MAE)],
+    model_mlr_robustscaling_final$results$RMSE[which.min(model_mlr_robustscaling_final$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+# MLR Comparison
+mlr_comparison_final <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_mlr_raw_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_mlr_robustscaling_final$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_mlr_raw_final$results$RMSE[which.min(model_mlr_raw_final$results$MAE)],
+    model_mlr_zscore_final$results$RMSE[which.min(model_mlr_zscore_final$results$MAE)],
+    model_mlr_minmax_final$results$RMSE[which.min(model_mlr_minmax_final$results$MAE)],
+    model_mlr_unitscale_final$results$RMSE[which.min(model_mlr_unitscale_final$results$MAE)],
+    model_mlr_robustscaling_final$results$RMSE[which.min(model_mlr_robustscaling_final$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+mlr_comparison_final <- mlr_comparison_final[order(mlr_comparison_final$MAE), ]
+
+# Ridge Comparison
+ridge_comparison_final <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_ridge_raw_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling_final$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_ridge_raw_final$results$RMSE[which.min(model_ridge_raw_final$results$MAE)],
+    model_ridge_zscore_final$results$RMSE[which.min(model_ridge_zscore_final$results$MAE)],
+    model_ridge_minmax_final$results$RMSE[which.min(model_ridge_minmax_final$results$MAE)],
+    model_ridge_unitscale_final$results$RMSE[which.min(model_ridge_unitscale_final$results$MAE)],
+    model_ridge_robustscaling_final$results$RMSE[which.min(model_ridge_robustscaling_final$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+ridge_comparison_final <- ridge_comparison_final[order(ridge_comparison_final$MAE), ]
+
+# Lasso Comparison
+lasso_comparison_final <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_lasso_raw_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling_final$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_lasso_raw_final$results$RMSE[which.min(model_lasso_raw_final$results$MAE)],
+    model_lasso_zscore_final$results$RMSE[which.min(model_lasso_zscore_final$results$MAE)],
+    model_lasso_minmax_final$results$RMSE[which.min(model_lasso_minmax_final$results$MAE)],
+    model_lasso_unitscale_final$results$RMSE[which.min(model_lasso_unitscale_final$results$MAE)],
+    model_lasso_robustscaling_final$results$RMSE[which.min(model_lasso_robustscaling_final$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+lasso_comparison_final <- lasso_comparison_final[order(lasso_comparison_final$MAE), ]
+
+# Elastic Net Comparison
+elasticnet_comparison_final <- data.frame(
+  Method = c("Raw Data", "Z-Score", "Min-Max", "Unit Scaling", "Robust Scaling"),
+  MAE = c(
+    min(model_elasticnet_raw_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling_final$results$MAE, na.rm = TRUE)
+  ),
+  RMSE = c(
+    model_elasticnet_raw_final$results$RMSE[which.min(model_elasticnet_raw_final$results$MAE)],
+    model_elasticnet_zscore_final$results$RMSE[which.min(model_elasticnet_zscore_final$results$MAE)],
+    model_elasticnet_minmax_final$results$RMSE[which.min(model_elasticnet_minmax_final$results$MAE)],
+    model_elasticnet_unitscale_final$results$RMSE[which.min(model_elasticnet_unitscale_final$results$MAE)],
+    model_elasticnet_robustscaling_final$results$RMSE[which.min(model_elasticnet_robustscaling_final$results$MAE)]
+  ),
+  stringsAsFactors = FALSE
+)
+elasticnet_comparison_final <- elasticnet_comparison_final[order(elasticnet_comparison_final$MAE), ]
+
+
+# Define colors for each model
+colors <- list(
+  mlr = "#1B9E77",
+  ridge = "#D95F02",
+  lasso = "#7570B3",
+  elasticnet = "#E7298A"
+)
+
+# Filter out Z-Score from all comparisons (keep only: Raw Data, Min-Max, Unit Scaling, Robust Scaling)
+mlr_filtered <- mlr_comparison_final[mlr_comparison_final$Method != "Z-Score", ]
+ridge_filtered <- ridge_comparison_final[ridge_comparison_final$Method != "Z-Score", ]
+lasso_filtered <- lasso_comparison_final[lasso_comparison_final$Method != "Z-Score", ]
+elasticnet_filtered <- elasticnet_comparison_final[elasticnet_comparison_final$Method != "Z-Score", ]
+
+## MLR
+barplot_mlr_final <- barplot(
+  mlr_filtered$MAE,
+  names.arg = rep("", nrow(mlr_filtered)),   # remove default names
+  horiz = TRUE,
+  xlab = "MAE",
+  ylab = "",
+  main = "MLR",
+  col = colors$mlr,
+  xlim = c(min(mlr_filtered$MAE) - 0.01, max(mlr_filtered$MAE) + 0.08),
+  cex.names = 0.9,
+  cex.axis  = 0.9,
+  las = 1
+)
+
+# bar values
+text(mlr_filtered$MAE / 2,
+     barplot_mlr_final,
+     paste0(round(mlr_filtered$MAE, 4)),
+     cex = 0.5, font = 2, col = "white")
+
+# method labels to the right of bars
+text(max(mlr_filtered$MAE) + 0.04,
+     barplot_mlr_final,
+     labels = mlr_filtered$Method,
+     adj = 0, cex = 0.8)
+
+## RIDGE
+barplot_ridge_final <- barplot(
+  ridge_filtered$MAE,
+  names.arg = rep("", nrow(ridge_filtered)),
+  horiz = TRUE,
+  xlab = "MAE",
+  ylab = "",
+  main = "Ridge",
+  col = colors$ridge,
+  xlim = c(min(ridge_filtered$MAE) - 0.01, max(ridge_filtered$MAE) + 0.08),
+  cex.names = 0.9,
+  cex.axis  = 0.9,
+  las = 1
+)
+
+text(ridge_filtered$MAE / 2,
+     barplot_ridge_final,
+     paste0(round(ridge_filtered$MAE, 4)),
+     cex = 0.5, font = 2, col = "white")
+
+text(max(ridge_filtered$MAE) + 0.04,
+     barplot_ridge_final,
+     labels = ridge_filtered$Method,
+     adj = 0, cex = 0.8)
+
+## LASSO
+barplot_lasso_final <- barplot(
+  lasso_filtered$MAE,
+  names.arg = rep("", nrow(lasso_filtered)),
+  horiz = TRUE,
+  xlab = "MAE",
+  ylab = "",
+  main = "Lasso",
+  col = colors$lasso,
+  xlim = c(min(lasso_filtered$MAE) - 0.01, max(lasso_filtered$MAE) + 0.08),
+  cex.names = 0.9,
+  cex.axis  = 0.9,
+  las = 1
+)
+
+text(lasso_filtered$MAE / 2,
+     barplot_lasso_final,
+     paste0(round(lasso_filtered$MAE, 4)),
+     cex = 0.5, font = 2, col = "white")
+
+text(max(lasso_filtered$MAE) + 0.04,
+     barplot_lasso_final,
+     labels = lasso_filtered$Method,
+     adj = 0, cex = 0.8)
+
+## ELASTIC NET
+barplot_elasticnet_final <- barplot(
+  elasticnet_filtered$MAE,
+  names.arg = rep("", nrow(elasticnet_filtered)),
+  horiz = TRUE,
+  xlab = "MAE",
+  ylab = "",
+  main = "Elastic Net",
+  col = colors$elasticnet,
+  xlim = c(min(elasticnet_filtered$MAE) - 0.01, max(elasticnet_filtered$MAE) + 0.08),
+  cex.names = 0.9,
+  cex.axis  = 0.9,
+  las = 1
+)
+
+text(elasticnet_filtered$MAE / 2,
+     barplot_elasticnet_final,
+     paste0(round(elasticnet_filtered$MAE, 4)),
+     cex = 0.5, font = 2, col = "white")
+
+text(max(elasticnet_filtered$MAE) + 0.04,
+     barplot_elasticnet_final,
+     labels = elasticnet_filtered$Method,
+     adj = 0, cex = 0.8)
+
+# Overall title
+mtext("Model Comparison Across Normalization Methods | Log-Transformed Features | RepeatedCV 100x1",
+      side = 3, outer = TRUE, cex = 1.05, font = 2)
+
+
+
+# SUMMARY OUTPUT (Excluding Z-Score)
+
+# Get best combination overall (excluding Z-Score)
+best_mlr_mae <- mlr_filtered$MAE[1]
+best_mlr_method <- mlr_filtered$Method[1]
+
+best_ridge_mae <- ridge_filtered$MAE[1]
+best_ridge_method <- ridge_filtered$Method[1]
+
+best_lasso_mae <- lasso_filtered$MAE[1]
+best_lasso_method <- lasso_filtered$Method[1]
+
+best_elasticnet_mae <- elasticnet_filtered$MAE[1]
+best_elasticnet_method <- elasticnet_filtered$Method[1]
+
+# Overall best model
+overall_comparison_final <- data.frame(
+  Model = c("MLR", "Ridge", "Lasso", "Elastic Net"),
+  Best_Method = c(best_mlr_method, best_ridge_method, best_lasso_method, best_elasticnet_method),
+  MAE = c(best_mlr_mae, best_ridge_mae, best_lasso_mae, best_elasticnet_mae),
+  stringsAsFactors = FALSE
+)
+overall_comparison_final <- overall_comparison_final[order(overall_comparison_final$MAE), ]
+print(overall_comparison_final)
+
+# Master results: All 20 combinations (4 models x 5 normalizations)
+master_results_final <- data.frame(
+  Model = rep(c("MLR", "Ridge", "Lasso", "Elastic Net"), 5),
+  Normalization = c(
+    rep("Z-Score", 4), rep("Min-Max", 4), rep("Unit Scaling", 4),
+    rep("Robust Scaling", 4), rep("Raw Data", 4)
+  ),
+  MAE = c(
+    # Z-Score
+    min(model_mlr_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_zscore_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_zscore_final$results$MAE, na.rm = TRUE),
+    # Min-Max
+    min(model_mlr_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_minmax_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_minmax_final$results$MAE, na.rm = TRUE),
+    # Unit Scaling
+    min(model_mlr_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_unitscale_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_unitscale_final$results$MAE, na.rm = TRUE),
+    # Robust Scaling
+    min(model_mlr_robustscaling_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_robustscaling_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_robustscaling_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_robustscaling_final$results$MAE, na.rm = TRUE),
+    # Raw Data
+    min(model_mlr_raw_final$results$MAE, na.rm = TRUE),
+    min(model_ridge_raw_final$results$MAE, na.rm = TRUE),
+    min(model_lasso_raw_final$results$MAE, na.rm = TRUE),
+    min(model_elasticnet_raw_final$results$MAE, na.rm = TRUE)
+  ),
+  stringsAsFactors = FALSE
+)
+
+
+# COMPUTE RANKINGS
+# Top 5 combinations (by MAE)
+top_5_combos_final <- master_results_final[order(master_results_final$MAE), ][1:5, ]
+
+# Best normalization method (average MAE across all 4 models)
+norm_by_method_final <- aggregate(MAE ~ Normalization, data = master_results_final, FUN = mean)
+norm_by_method_final <- norm_by_method_final[order(norm_by_method_final$MAE), ]
+best_norm_final <- norm_by_method_final[1, ]
+
+# Best model type (average MAE across all 5 normalizations)
+model_by_type_final <- aggregate(MAE ~ Model, data = master_results_final, FUN = mean)
+model_by_type_final <- model_by_type_final[order(model_by_type_final$MAE), ]
+best_model_final <- model_by_type_final[1, ]
+
+
+# VISUALIZATION: Compact Design - Log Transformed Features
+par(mfrow = c(2, 2), mar = c(0.5, 0.5, 1.5, 0.5), oma = c(0, 0, 1.8, 0))
+
+# Color schemes
+colors_5 <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E")
+model_color_map <- list(
+  "MLR" = "#1B9E77",
+  "Ridge" = "#D95F02",
+  "Lasso" = "#7570B3",
+  "Elastic Net" = "#E7298A"
+)
+
+#Top 5 Rankings
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10.5),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Top 5 Model + Normalization Combinations", 
+     cex.main = 1.1, font.main = 2)
+
+y_start <- 10
+rank_box_height <- 1.9
+
+for (i in 1:5) {
+  y_pos <- y_start - (i - 1) * rank_box_height
+  
+  # Draw ranking box with model color
+  model_col <- as.character(top_5_combos_final$Model[i])
+  box_color <- model_color_map[[model_col]]
+  
+  rect(0.2, y_pos - 1.6, 9.8, y_pos,
+       col = adjustcolor(box_color, alpha.f = 0.2),
+       border = box_color, lwd = 2.5)
+  
+  
+  text(0.7, y_pos - 0.8, as.character(i),
+       cex = 2.2, font = 2, col = box_color, adj = 0.5)
+  
+  
+  text(2.0, y_pos - 0.3, sprintf("%s", top_5_combos_final$Model[i]),
+       cex = 1.05, font = 2, adj = 0)
+  
+  
+  text(2.0, y_pos - 0.85, sprintf("%s", top_5_combos_final$Normalization[i]),
+       cex = 0.9, font = 1, col = "#333333", adj = 0)
+  
+  
+  text(9.3, y_pos - 0.55, sprintf("%.4f", top_5_combos_final$MAE[i]),
+       cex = 1.0, font = 2, col = box_color, adj = 1)
+}
+
+#Best Normalization Method
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Best Normalization Method",
+     cex.main = 1.1, font.main = 2)
+
+
+rect(0.3, 1.0, 9.7, 9.2,
+     col = adjustcolor("#4CAF50", alpha.f = 0.12),
+     border = "#4CAF50", lwd = 3.5)
+
+text(5, 8.5, "BEST NORMALIZATION", 
+     cex = 1.0, font = 2, col = "#2E7D32", adj = 0.5)
+
+text(5, 7.3, best_norm_final$Normalization,
+     cex = 1.7, font = 2, adj = 0.5)
+
+text(5, 6.1, sprintf("Average MAE: %.4f", best_norm_final$MAE),
+     cex = 1.0, font = 2, col = "#2E7D32", adj = 0.5)
+
+lines(c(1.5, 8.5), c(5.5, 5.5), col = "#4CAF50", lwd = 1.5, lty = 2)
+
+best_norm_data_final <- master_results_final[master_results_final$Normalization == best_norm_final$Normalization, ]
+best_norm_data_final <- best_norm_data_final[order(best_norm_data_final$MAE), ]
+
+text(5, 4.8, "Performance by Model:", cex = 0.9, font = 2, adj = 0.5)
+
+for (j in 1:min(4, nrow(best_norm_data_final))) {
+  model_name <- best_norm_data_final$Model[j]
+  mae_val <- best_norm_data_final$MAE[j]
+  text(5, 4.2 - (j-1)*0.4, 
+       sprintf("%d. %s (MAE: %.4f)", j, model_name, mae_val),
+       cex = 0.85, font = 1, adj = 0.5)
+}
+
+#3 Best Model Type
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Best Model Type",
+     cex.main = 1.1, font.main = 2)
+
+rect(0.3, 1.0, 9.7, 9.2,
+     col = adjustcolor("#2196F3", alpha.f = 0.12),
+     border = "#2196F3", lwd = 3.5)
+
+text(5, 8.5, "BEST MODEL", 
+     cex = 1.0, font = 2, col = "#0D47A1", adj = 0.5)
+
+text(5, 7.3, best_model_final$Model,
+     cex = 1.7, font = 2, adj = 0.5)
+
+text(5, 6.1, sprintf("Average MAE: %.4f", best_model_final$MAE),
+     cex = 1.0, font = 2, col = "#0D47A1", adj = 0.5)
+
+lines(c(1.5, 8.5), c(5.5, 5.5), col = "#2196F3", lwd = 1.5, lty = 2)
+
+best_model_data_final <- master_results_final[master_results_final$Model == best_model_final$Model, ]
+best_model_data_final <- best_model_data_final[order(best_model_data_final$MAE), ]
+
+text(5, 4.8, "Performance by Normalization:", cex = 0.9, font = 2, adj = 0.5)
+
+for (j in 1:min(4, nrow(best_model_data_final))) {
+  norm_name <- best_model_data_final$Normalization[j]
+  mae_val <- best_model_data_final$MAE[j]
+  text(5, 4.2 - (j-1)*0.4, 
+       sprintf("%d. %s (MAE: %.4f)", j, norm_name, mae_val),
+       cex = 0.85, font = 1, adj = 0.5)
+}
+
+#PANEL 4: Comparative Metrics
+plot(NULL, xlim = c(0, 10), ylim = c(0, 10),
+     asp = 1, axes = FALSE, xlab = "", ylab = "",
+     main = "Performance Summary",
+     cex.main = 1.1, font.main = 2)
+
+best_combo_final <- master_results_final[which.min(master_results_final$MAE), ]
+worst_combo_final <- master_results_final[which.max(master_results_final$MAE), ]
+
+# Best combo
+rect(0.3, 6.8, 9.7, 9.2,
+     col = adjustcolor("#4CAF50", alpha.f = 0.15),
+     border = "#4CAF50", lwd = 2.5)
+text(0.7, 8.7, "Best Combination:", cex = 0.95, font = 2, adj = 0)
+text(0.7, 8.1, sprintf("%s + %s", best_combo_final$Model, best_combo_final$Normalization), 
+     cex = 0.9, font = 1, adj = 0)
+text(9.3, 7.9, sprintf("MAE: %.4f", best_combo_final$MAE),
+     cex = 0.95, font = 2, col = "#2E7D32", adj = 1)
+
+# Worst combo
+rect(0.3, 4.0, 9.7, 6.4,
+     col = adjustcolor("#F44336", alpha.f = 0.15),
+     border = "#F44336", lwd = 2.5)
+text(0.7, 5.9, "Worst Combination:", cex = 0.95, font = 2, adj = 0)
+text(0.7, 5.3, sprintf("%s + %s", worst_combo_final$Model, worst_combo_final$Normalization), 
+     cex = 0.9, font = 1, adj = 0)
+text(9.3, 5.1, sprintf("MAE: %.4f", worst_combo_final$MAE),
+     cex = 0.95, font = 2, col = "#C62828", adj = 1)
+
+# Improvement
+improvement_final <- ((worst_combo_final$MAE - best_combo_final$MAE) / best_combo_final$MAE * 100)
+rect(0.3, 1.5, 9.7, 3.5,
+     col = adjustcolor("#FF9800", alpha.f = 0.15),
+     border = "#FF9800", lwd = 2.5)
+text(5, 3.0, sprintf("Improvement: %.2f%%", improvement_final),
+     cex = 1.05, font = 2, col = "#E65100", adj = 0.5)
+text(5, 2.1, sprintf("Best outperforms worst by %.4f MAE", worst_combo_final$MAE - best_combo_final$MAE),
+     cex = 0.85, font = 1, adj = 0.5)
+
+
+
+
+
+#______________________________________________________________________________
+#______________________________________________________________________________
+# 🚨 🚨 🚨 🚨 🚨 STOP AND READ THIS BEFORE PROCEEDING 🚨 🚨 🚨 🚨 🚨
+#______________________________________________________________________________
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 ============================================================
+#This code is computationally stringent please be cautious in running
+# 🚨 ============================================================
+
+if (!require(caret)) install.packages("caret")
+if (!require(xgboost)) install.packages("xgboost")
+library(caret)
+library(xgboost)
+
+set.seed(1)
+
+
+# CHECK FOR NAs
+print(paste("Rows in robustscaling_abalone:", nrow(robustscaling_abalone)))
+print(paste("NAs in data:", sum(is.na(robustscaling_abalone))))
+
+# REMOVE NAs IF ANY
+robustscaling_abalone <- robustscaling_abalone[complete.cases(robustscaling_abalone), ]
+print(paste("Rows after removing NAs:", nrow(robustscaling_abalone)))
+
+# AGGRESSIVE CONTROL - 10-FOLD CV (LOOCV too slow for XGB)
+train_control_XGB <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  summaryFunction = defaultSummary,
+  allowParallel = TRUE,
+  verboseIter = TRUE
+)
+
+# EXPANDED XGBOOST TUNING GRID - 48 COMBINATIONS
+xgb_tune_grid <- expand.grid(
+  nrounds = c(500, 750, 1000),
+  eta = c(0.01, 0.05, 0.1),
+  max_depth = c(5, 6, 7, 8),
+  gamma = c(0, 0.1),
+  colsample_bytree = c(0.7, 0.8, 0.9),
+  min_child_weight = c(1, 2),
+  subsample = c(0.7, 0.8, 0.9)
+)
+
+print(paste("Testing", nrow(xgb_tune_grid), "parameter combinations"))
+
+# XGB MODEL - AGGRESSIVE TUNING
+model_xgb_best <- train(
+  Age ~ Sex + Length + Diameter + Height + Whole_weight + Shucked_Weight + 
+    Viscera_Weight + Shell_Weight + log_Whole_weight + log_Shucked_Weight + 
+    log_Viscera_Weight + log_Shell_Weight,
+  data = robustscaling_abalone,
+  method = "xgbTree",
+  tuneGrid = xgb_tune_grid,
+  trControl = train_control_XGB,
+  metric = "MAE",
+  verbosity = 0
+)
+
+print("XGB MODEL: XGBoost with Robust Scaling + Log-Transformed Weights (AGGRESSIVE TUNING)")
+print(model_xgb_best)
+print(paste("Best MAE:", round(min(model_xgb_best$results$MAE, na.rm = TRUE), 4)))
+print(paste("Best RMSE:", round(model_xgb_best$results$RMSE[which.min(model_xgb_best$results$MAE)], 4)))
+print("Best hyperparameters:")
+print(model_xgb_best$bestTune)
+
+# SAVE FOR VISUALIZATION LATER
+saveRDS(model_xgb_best, "model_xgb_best.rds")
+saveRDS(robustscaling_abalone, "data_xgb_best.rds")
+print("XGB Model and data saved for visualization tomorrow")
+
+#______________________________________________________________________________
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+# 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨
+#______________________________________________________________________________
